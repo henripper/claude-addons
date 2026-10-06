@@ -1,0 +1,11 @@
+{
+  "name": "claude-addons",
+  "owner": { "name": "henrip" },
+  "plugins": [
+    {
+      "name": "usage-band",
+      "source": "./usage-band",
+      "description": "Shows plan usage (session and weekly limits) and when each resets, above the prompt"
+    }
+  ]
+}

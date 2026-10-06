@@ -1,0 +1,1 @@
+{ "name": "usage-band", "version": "0.1.0", "description": "Shows plan usage (session and weekly limits) and when each resets, above the prompt", "types": "./types/index.d.ts" }
