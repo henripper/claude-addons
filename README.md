@@ -11,13 +11,13 @@ My Claude Code mods (plugins built from function hooks), kept in one place so ev
 macOS / Linux:
 
 ```bash
-git clone https://github.com/REPLACE_ME/claude-addons.git ~/.claude/mods && ~/.claude/mods/install.sh
+git clone https://github.com/henripper/claude-addons.git ~/.claude/mods && ~/.claude/mods/install.sh
 ```
 
 Windows (PowerShell):
 
 ```powershell
-git clone https://github.com/REPLACE_ME/claude-addons.git $HOME\.claude\mods; & $HOME\.claude\mods\install.ps1
+git clone https://github.com/henripper/claude-addons.git $HOME\.claude\mods; & $HOME\.claude\mods\install.ps1
 ```
 
 The script lists every add-on folder in `CLAUDE_CODE_PLUGIN_DIRS` in `~/.claude/settings.json`. Start a new Claude Code session (desktop app or terminal) to load them.

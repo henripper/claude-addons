@@ -1,6 +1,6 @@
 {
   "name": "claude-addons",
-  "owner": { "name": "henrip" },
+  "owner": { "name": "henripper" },
   "plugins": [
     {
       "name": "usage-band",

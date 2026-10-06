@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Install or update these Claude Code add-ons on macOS / Linux.
-#   curl -fsSL https://raw.githubusercontent.com/<you>/claude-addons/main/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/henripper/claude-addons/main/install.sh | bash
 # or, from a clone:  ./install.sh
 set -euo pipefail
-REPO_URL="${CLAUDE_ADDONS_REPO:-https://github.com/REPLACE_ME/claude-addons.git}"
+REPO_URL="${CLAUDE_ADDONS_REPO:-https://github.com/henripper/claude-addons.git}"
 DEST="$HOME/.claude/mods"
 
 if [ -d "$DEST/.git" ]; then

@@ -1,7 +1,7 @@
 # Install or update these Claude Code add-ons on Windows.
-#   irm https://raw.githubusercontent.com/<you>/claude-addons/main/install.ps1 | iex
+#   irm https://raw.githubusercontent.com/henripper/claude-addons/main/install.ps1 | iex
 $ErrorActionPreference = 'Stop'
-$RepoUrl = if ($env:CLAUDE_ADDONS_REPO) { $env:CLAUDE_ADDONS_REPO } else { 'https://github.com/REPLACE_ME/claude-addons.git' }
+$RepoUrl = if ($env:CLAUDE_ADDONS_REPO) { $env:CLAUDE_ADDONS_REPO } else { 'https://github.com/henripper/claude-addons.git' }
 $Dest = Join-Path $HOME '.claude\mods'
 
 if (Test-Path (Join-Path $Dest '.git')) { git -C $Dest pull --ff-only }
