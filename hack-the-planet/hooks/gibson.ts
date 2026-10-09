@@ -13,7 +13,7 @@ const WORDS: Record<string, string[]> = {
   requesting: ['DIALING IN', 'CALLING THE OPERATOR', 'REROUTING VIA {COUNTRY}', 'JACKING IN'],
   responding: ['UPLOADING PAYLOAD', 'TRANSMITTING', 'WRITING TO THE MAINFRAME'],
   'tool-input': ['INJECTING CODE', 'ARMING EXPLOIT'],
-  'tool-use': ['INFILTRATING', 'BYPASSING ICE', 'REROUTING VIA {COUNTRY}', 'FOLLOWING THE WHITE RABBIT', 'HACKING THE GIBSON', 'DODGING BULLETS'],
+  'tool-use': ['INFILTRATING', 'BYPASSING ICE', 'FOLLOWING THE WHITE RABBIT', 'HACKING THE GIBSON', 'DODGING BULLETS'],
 }
 
 /** A small deterministic hash, so a frame always draws the same cells. */
