@@ -9,11 +9,11 @@ export const RED = '#ff4d5e'
 const GLYPHS = 'ｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉ0123456789ABCDEF<>{}#$%&*+=/|'
 
 const WORDS: Record<string, string[]> = {
-  thinking: ['DECRYPTING', 'CRACKING CIPHERS', 'BRUTE-FORCING', 'RUNNING THE NUMBERS'],
-  requesting: ['DIALING IN', 'HANDSHAKING', 'REROUTING VIA BULGARIA', 'PINGING THE SATELLITE'],
+  thinking: ['DECRYPTING', 'CRACKING CIPHERS', 'THERE IS NO SPOON', 'BRUTE-FORCING', 'BENDING THE SPOON'],
+  requesting: ['DIALING IN', 'CALLING THE OPERATOR', 'REROUTING VIA BULGARIA', 'JACKING IN'],
   responding: ['UPLOADING PAYLOAD', 'TRANSMITTING', 'WRITING TO THE MAINFRAME'],
   'tool-input': ['INJECTING CODE', 'ARMING EXPLOIT'],
-  'tool-use': ['INFILTRATING', 'BYPASSING ICE', 'HACKING THE GIBSON', 'PLANTING THE WORM'],
+  'tool-use': ['INFILTRATING', 'BYPASSING ICE', 'FOLLOWING THE WHITE RABBIT', 'HACKING THE GIBSON', 'DODGING BULLETS'],
 }
 
 /** A small deterministic hash, so a frame always draws the same cells. */
@@ -71,45 +71,6 @@ export function shortTool(tool: string, input: Record<string, unknown>): string 
   return one ? `${tool} ${one.length > 40 ? one.slice(0, 39) + '…' : one}` : tool
 }
 
-/** A column of the rain: its speed and phase, fixed per column. */
-function drop(x: number, seed: number): { speed: number; offset: number; length: number } {
-  const h = hash(x, seed)
-  return { speed: 1 + (h % 3), offset: h % 97, length: 5 + ((h >>> 8) % 9) }
-}
-
-/**
- * The terminal's rain: `columns * rows` cells packed for a Raster, `[codePoint, fg, bg]`
- * as little-endian u32 triplets, base64.
- */
-export function rainCells(columns: number, rows: number, frame: number, seed = 1): string {
-  return encodeCells(rainWords(columns, rows, frame, seed))
-}
-
-/** The rain as raw cell words, for a caller that paints more over it before encoding. */
-export function rainWords(columns: number, rows: number, frame: number, seed = 1): Uint32Array {
-  const words = new Uint32Array(columns * rows * 3)
-  const DEFAULT = 0x01000000
-  for (let x = 0; x < columns; x++) {
-    const { speed, offset, length } = drop(x, seed)
-    const cycle = rows + length + 6
-    const head = Math.floor((frame * speed) / 2 + offset) % cycle
-    for (let y = 0; y < rows; y++) {
-      const i = (y * columns + x) * 3
-      const d = head - y
-      let code = 0x20
-      let fg = DEFAULT
-      if (x % 2 === 0 && d >= 0 && d < length) {
-        code = glyph(x, y, Math.floor(frame / 3) + (d === 0 ? frame : 0)).codePointAt(0)!
-        fg = d === 0 ? 0xd8ffe4 : d < 3 ? 0x3dff7a : d < length - 2 ? 0x1f9e4a : 0x0e5a2a
-      }
-      words[i] = code
-      words[i + 1] = fg
-      words[i + 2] = DEFAULT
-    }
-  }
-  return words
-}
-
 export function encodeCells(words: Uint32Array): string {
   return toBase64(new Uint8Array(words.buffer, words.byteOffset, words.byteLength))
 }
@@ -130,49 +91,18 @@ function toBase64(bytes: Uint8Array): string {
   return out
 }
 
-function escapeXml(text: string): string {
-  return text.replace(/[<>&'"]/g, ch => `&#${ch.charCodeAt(0)};`)
-}
-
-/**
- * The desktop's rain: one SVG that animates itself with SMIL, so it falls smoothly
- * without a redraw. Its source depends only on the size, so redraws keep it running.
- */
-export function rainSvg(width: number, height: number, seed = 1, scene = '', isTitleLeft = false): string {
-  const step = 14
-  const columns = Math.floor(width / step)
-  const parts: string[] = []
-  for (let x = 0; x < columns; x++) {
-    const { speed, offset, length } = drop(x, seed)
-    const span = length * step
-    const dur = (6 / speed + (offset % 5) * 0.4).toFixed(1)
-    const begin = -((offset % 40) / 10).toFixed(1)
-    const glyphs: string[] = []
-    for (let k = 0; k < length; k++) {
-      const isHead = k === length - 1
-      const opacity = isHead ? 1 : ((k + 1) / length) * 0.85
-      const fill = isHead ? HOT : GREEN
-      glyphs.push(
-        `<text y="${k * step}" fill="${fill}" fill-opacity="${opacity.toFixed(2)}">${escapeXml(glyph(x, k, seed))}</text>`,
-      )
-    }
-    parts.push(
-      `<g transform="translate(${x * step + 3} 0)"><g>${glyphs.join('')}` +
-        `<animateTransform attributeName="transform" type="translate" from="0 ${-span}" to="0 ${height + step}" dur="${dur}s" begin="${begin}s" repeatCount="indefinite"/></g></g>`,
-    )
-  }
-  const tx = isTitleLeft ? 142 : width / 2
-  const ty = isTitleLeft ? 36 : height / 2
-  const title =
-    `<g font-family="ui-monospace, Menlo, monospace" font-size="22" font-weight="bold" text-anchor="middle">` +
-    `<rect x="${tx - 130}" y="${ty - 26}" width="260" height="44" fill="#020a04" fill-opacity="0.82" stroke="${GREEN}" stroke-width="1"/>` +
-    `<text x="${tx}" y="${ty + 4}" fill="${GREEN}">░▒▓ THE GIBSON ▓▒░` +
-    `<animate attributeName="fill-opacity" values="1;1;0.3;1;1;1;0.6;1" dur="3.7s" repeatCount="indefinite"/></text>` +
-    `<text x="${tx}" y="${ty + 14}" font-size="9" fill="${DIM}" letter-spacing="3">HACK THE PLANET</text></g>`
+/** The original banner: the boxed, flickering title over HACK THE PLANET, on black. */
+export function titleSvg(width: number): string {
+  const height = 70
+  const tx = width / 2
+  const ty = height / 2
   return (
     `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">` +
     `<rect width="100%" height="100%" fill="#020a04"/>` +
-    `<g font-family="ui-monospace, Menlo, monospace" font-size="13">${parts.join('')}</g>` +
-    `<g font-family="ui-monospace, Menlo, monospace">${scene}</g>${title}</svg>`
+    `<g font-family="ui-monospace, Menlo, monospace" font-size="22" font-weight="bold" text-anchor="middle">` +
+    `<rect x="${tx - 130}" y="${ty - 26}" width="260" height="44" fill="#020a04" stroke="${GREEN}" stroke-width="1"/>` +
+    `<text x="${tx}" y="${ty + 4}" fill="${GREEN}">░▒▓ THE GIBSON ▓▒░` +
+    `<animate attributeName="fill-opacity" values="1;1;0.3;1;1;1;0.6;1" dur="3.7s" repeatCount="indefinite"/></text>` +
+    `<text x="${tx}" y="${ty + 14}" font-size="9" fill="${DIM}" letter-spacing="3">HACK THE PLANET</text></g></svg>`
   )
 }

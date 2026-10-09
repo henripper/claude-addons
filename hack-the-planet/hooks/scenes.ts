@@ -1,7 +1,7 @@
 // Heavy-traffic scenes: a spinning pixel globe and a cargo freighter flyby.
 // Pure like gibson.ts: the terminal gets cell grids, the desktop SMIL-animated SVG.
 
-import { AMBER, DIM, GREEN, HOT, RED } from './gibson'
+import { DIM, GREEN, HOT } from './gibson'
 
 export type Load = 0 | 1 | 2
 
@@ -96,20 +96,6 @@ export function globeCells(rows: number, frame: number, satellites: number): Cel
   }
   return cells
 }
-
-// The freighter, nose to the right. H hull, h hull shade, W windows, C/c/k containers, E engine.
-const SHIP = [
-  '             HHH          ',
-  '            HWWWH         ',
-  '   CckCckCck HHHHH        ',
-  '   CckCckCckHHHHHHH       ',
-  ' EEHHHHHHHHHHHHHHHHHHH    ',
-  'EEEHHHWHHWHHWHHWHHHHHHHH  ',
-  ' EEhhhhhhhhhhhhhhhhhhhhh  ',
-  '    hhhhhhhhhhhhhhhhhh    ',
-]
-
-const SHIP_COLORS: Record<string, string> = { H: GREEN, h: DIM, W: HOT, C: AMBER, c: RED, k: HOT, E: AMBER }
 
 // The terminal's freighter, three rows: trail, containers, hull.
 const SHIP_CELLS = ['      ▗▄█▖   ', '░▒▓█████████▙▖', '   ▀▀▀▀▀▀▀▀▀▀ ']
@@ -223,24 +209,11 @@ export function globeSvg(cx: number, cy: number, radius: number, satellites: num
   )
 }
 
-/** The desktop's freighter: crosses in seven seconds, then waits off screen, engines flickering. */
-export function shipSvg(width: number, y: number): string {
-  const px = 4
-  const shipWidth = SHIP[0]!.length * px
-  const paths = Object.entries(SHIP_COLORS)
-    .map(([ch, color]) => {
-      const d = runsPath(SHIP, c => c === ch)
-      if (!d) return ''
-      const flicker = ch === 'E' ? `<animate attributeName="fill-opacity" values="1;0.4;0.9;0.5;1" dur="0.4s" repeatCount="indefinite"/>` : ''
-      return `<path fill="${color}" d="${d}">${flicker}</path>`
-    })
-    .join('')
-  const trail = [0, 1, 2, 3]
-    .map(k => `<rect x="${-6 - k * 7}" y="${4.6 + (k % 2) * 0.6}" width="${5 - k}" height="1.2" fill="${AMBER}" fill-opacity="${(0.7 - k * 0.15).toFixed(2)}"/>`)
-    .join('')
+/** The globe on its own dark panel, for the desktop's busy level. */
+export function globePanelSvg(w: number, h: number, satellites: number): string {
   return (
-    `<g><g transform="scale(${px})">${trail}${paths}</g>` +
-    `<text x="${shipWidth / 2 - 8}" y="${SHIP.length * px + 12}" font-size="9" fill="${AMBER}" text-anchor="middle" letter-spacing="2">CARGO: PAYLOAD</text>` +
-    `<animateTransform attributeName="transform" type="translate" values="${-shipWidth - 40} ${y};${width + 40} ${y};${width + 40} ${y}" keyTimes="0;0.6;1" dur="11s" repeatCount="indefinite"/></g>`
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">` +
+    `<rect width="100%" height="100%" fill="#020a04"/>` +
+    `<g font-family="ui-monospace, Menlo, monospace">${globeSvg(w / 2, h / 2 - 8, Math.min(70, h / 2 - 30), satellites)}</g></svg>`
   )
 }

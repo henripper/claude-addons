@@ -19,6 +19,8 @@ declare module 'claude-code' {
       daemons: Daemon[]
       feed: string[]
       frame: number
+      second: number
+      openedAt: number
       turn: Turn
       isPaneOpen: boolean
       isSpinnerOn: boolean

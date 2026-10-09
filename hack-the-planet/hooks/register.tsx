@@ -14,12 +14,13 @@ import {
   hackerWord,
   hex,
   encodeCells,
-  rainSvg,
-  rainWords,
   shortTool,
   sweep,
+  titleSvg,
 } from './gibson'
-import { globeCells, globeSvg, loadLevel, paintShip, shipLane, shipSvg } from './scenes'
+import { flybySvg } from './flyby'
+import { RABBIT_TEXT, nokiaSvg, rabbitSvg, wakeUpSvg } from './matrix'
+import { blank, globeCells, globePanelSvg, loadLevel, paintShip, shipLane } from './scenes'
 import type { Load } from './scenes'
 
 const PANE = 'gibson'
@@ -28,11 +29,17 @@ const FRAME_MS = 200
 const POLL_MS = 1000
 const LINGER_MS = 8000
 const GLITCH_MS = 1600
+const CALL_MS = 5000
+const RABBIT_MS = 5000
+const INTRO_MS = 9500
 const FEED_MAX = 40
 
 const daemons = atom({ plugin: 'hack-the-planet', key: 'daemons' } as const, [] as Daemon[])
 const feed = atom({ plugin: 'hack-the-planet', key: 'feed' } as const, [] as string[])
 const frame = atom({ plugin: 'hack-the-planet', key: 'frame' } as const, 0)
+// The desktop pane redraws once a second, not every frame: its SVGs animate themselves.
+const second = atom({ plugin: 'hack-the-planet', key: 'second' } as const, 0)
+const openedAt = atom({ plugin: 'hack-the-planet', key: 'openedAt' } as const, 0)
 const turn = atom({ plugin: 'hack-the-planet', key: 'turn' } as const, null as Turn)
 const isPaneOpen = atom({ plugin: 'hack-the-planet', key: 'isPaneOpen' } as const, false)
 const isSpinnerOn = atom({ plugin: 'hack-the-planet', key: 'isSpinnerOn' } as const, true)
@@ -53,8 +60,10 @@ function levelOf(list: readonly Daemon[], current: Turn): Load {
 const LOAD_LABEL = ['NOMINAL', 'BUSY', 'HEAVY TRAFFIC'] as const
 
 async function openPane($: EngineInterface): Promise<void> {
+  const wasOpen = await read($, isPaneOpen)
   await $.ui.open({ id: PANE, title: TITLE })
   await update($, isPaneOpen, () => true)
+  if (!wasOpen) await update($, openedAt, () => Date.now())
 }
 
 /** Brings the daemon list in line with the engine's agents; toasts each one that finishes. */
@@ -68,6 +77,7 @@ async function poll($: EngineInterface): Promise<void> {
     const before = await read($, daemons)
     const next: Daemon[] = []
     const finished: Daemon[] = []
+    const started: Daemon[] = []
 
     for (const one of before) {
       if (one.status !== 'running') {
@@ -85,6 +95,15 @@ async function poll($: EngineInterface): Promise<void> {
     }
     for (const agent of agents) {
       if (!LIVE.has(agent.status) || next.some(one => one.id === agent.id)) continue
+      started.push({
+        id: agent.id,
+        type: agent.type || 'agent',
+        description: agent.description,
+        tool: '',
+        status: 'running',
+        startedAt: now,
+        endedAt: 0,
+      })
       next.push({
         id: agent.id,
         type: agent.type || 'agent',
@@ -97,9 +116,14 @@ async function poll($: EngineInterface): Promise<void> {
     }
 
     if (JSON.stringify(next) !== JSON.stringify(before)) await update($, daemons, () => next)
+    for (const one of started) $.ui.toast(`☎ Operator: ${one.type.toUpperCase()} daemon is in. Knock, knock.`)
     for (const one of finished) {
-      const verdict = one.status === 'granted' ? 'ACCESS GRANTED' : 'ACCESS DENIED'
-      $.ui.toast(`◉ ${one.type.toUpperCase()} daemon: ${verdict} (${elapsed(one.endedAt - one.startedAt)})`)
+      const took = elapsed(one.endedAt - one.startedAt)
+      $.ui.toast(
+        one.status === 'granted'
+          ? `◉ ${one.type.toUpperCase()} daemon followed the white rabbit: ACCESS GRANTED (${took})`
+          : `◉ ${one.type.toUpperCase()} daemon: ACCESS DENIED (${took}). Agent Smith got it.`,
+      )
     }
   } catch (error) {
     $.ui.log(`hack-the-planet: poll failed: ${String(error)}`, { to: 'debug' })
@@ -111,11 +135,14 @@ async function poll($: EngineInterface): Promise<void> {
 /** Advances the animation only while something is on screen to animate. */
 async function tick($: EngineInterface): Promise<void> {
   const [running, open, list] = await Promise.all([read($, turn), read($, isPaneOpen), read($, daemons)])
-  if (running || open || list.length > 0) await update($, frame, n => n + 1)
+  if (running || open || list.length > 0) {
+    const n = await update($, frame, k => k + 1)
+    if (typeof n === 'number' && n % 5 === 0) await update($, second, k => k + 1)
+  }
   const load = levelOf(list, running)
   if (load === 2 && lastLoad < 2 && Date.now() - lastCargoToast > 60000) {
     lastCargoToast = Date.now()
-    $.ui.toast('⚠ CARGO INBOUND: heavy workload detected. Global uplink engaged.')
+    $.ui.toast('⚠ HEAVY TRAFFIC: recon drone dispatched. Scanning the cargo ship.')
   }
   lastLoad = load
 }
@@ -124,7 +151,7 @@ export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     await $.command.register({
       name: 'hack',
-      description: 'Jack into The Gibson: a code-rain pane of your running agents',
+      description: 'Jack into The Gibson: a pane of your running agents, Hackers and Matrix style',
       argumentHint: '[close | spinner on | spinner off]',
     })
     const saved = await $.store.get('isSpinnerOn')
@@ -243,36 +270,78 @@ export const register: Register = on => {
   })
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
-    const [n, list, lines, current] = await Promise.all([read($, frame), read($, daemons), read($, feed), read($, turn)])
+    const isTerminal = e.surface === 'terminal'
+    // The terminal animates by redrawing; the desktop's SVGs animate themselves, so it redraws per second.
+    const n = isTerminal ? await read($, frame) : (await read($, second)) * 5
+    const [list, lines, current, opened] = await Promise.all([read($, daemons), read($, feed), read($, turn), read($, openedAt)])
     const ui = $.ui.resolve(e)
     const { Box, Text, Button } = ui
     const columns = Math.max(20, e.props.bodyColumns)
     const rows = e.props.scroll.bodyRows || e.viewport?.rows || 30
     const now = Date.now()
     const live = list.filter(one => one.status === 'running').length
-
     const load = levelOf(list, current)
-    const rainRows = Math.max(load === 2 ? 6 : 4, Math.min(10, Math.floor(rows / 4)))
     const width = Math.min(columns * 8, 720)
-    const height = load >= 1 ? 240 : 180
-    const scene =
-      load >= 1
-        ? globeSvg(Math.max(width - 90, 330), 112, 62, live) + (load === 2 ? shipSvg(width, 168) : '')
-        : ''
 
-    let rain
-    if ('Raster' in ui) {
-      const words = rainWords(columns, rainRows, n)
-      if (load === 2) paintShip({ columns, rows: rainRows, words }, n, rainRows - 3)
-      const globe = load >= 1 ? globeCells(9, n, live) : null
-      rain = (
+    const calling = [...list].reverse().find(one => one.status === 'running' && now - one.startedAt < CALL_MS)
+    const rabbit = [...list].reverse().find(one => one.status === 'granted' && now - one.endedAt < RABBIT_MS)
+    const isIntro = opened > 0 && now - opened < INTRO_MS
+
+    let header
+    if (!isTerminal && 'Svg' in ui) {
+      // Each Svg sits in a keyed Box, so a redraw keeps it mounted and its animation running.
+      header = (
+        <Box flexDirection="column" gap={1}>
+          <Box key="title">
+            <ui.Svg source={titleSvg(width)} alt="The Gibson. Hack the planet." width={width} height={70} isInteractive />
+          </Box>
+          {isIntro && (
+            <Box key={`intro-${opened}`}>
+              <ui.Svg source={wakeUpSvg(width)} alt="Wake up, Neo. The Matrix has you. Follow the white rabbit. Knock, knock." width={width} height={150} isInteractive />
+            </Box>
+          )}
+          {load === 2 && (
+            <Box key="flyby">
+              <ui.Svg source={flybySvg(width, 330, live)} alt="Recon flyby of a cargo ship, ending on a scan of its bridge" width={width} height={330} isInteractive />
+            </Box>
+          )}
+          {load === 1 && (
+            <Box key="globe">
+              <ui.Svg source={globePanelSvg(width, 200, live)} alt={`A spinning globe with ${live} satellites`} width={width} height={200} isInteractive />
+            </Box>
+          )}
+          {calling && (
+            <Box key={`call-${calling.id}`}>
+              <ui.Svg source={nokiaSvg(width, calling.type, calling.description)} alt={`Incoming call: the operator dispatches the ${calling.type} daemon`} width={width} height={140} isInteractive />
+            </Box>
+          )}
+          {rabbit && (
+            <Box key={`rabbit-${rabbit.id}`}>
+              <ui.Svg source={rabbitSvg(width, rabbit.type, elapsed(rabbit.endedAt - rabbit.startedAt))} alt={`The white rabbit dives down its hole: ${rabbit.type} finished`} width={width} height={104} isInteractive />
+            </Box>
+          )}
+        </Box>
+      )
+    } else {
+      const globe = isTerminal && load >= 1 ? globeCells(9, n, live) : null
+      let lane = null
+      if (isTerminal && load === 2 && 'Raster' in ui) {
+        const cells = blank(columns, 3)
+        paintShip(cells, n, 0)
+        lane = <ui.Raster key="lane" columns={columns} rows={3} cells={encodeCells(cells.words)} />
+      }
+      header = (
         <Box flexDirection="column">
           <Text color={GREEN} bold>
             {'░▒▓ THE GIBSON ▓▒░'}
             <Text color={DIM}> hack the planet</Text>
           </Text>
-          <ui.Raster key="rain" columns={columns} rows={rainRows} cells={encodeCells(words)} />
-          {globe && (
+          {isIntro && (
+            <Text color={GREEN}>
+              {['Wake up, Neo…', 'The Matrix has you…', 'Follow the white rabbit.', 'Knock, knock, Neo.'][Math.min(3, Math.floor((now - opened) / 1500))]}
+            </Text>
+          )}
+          {globe && 'Raster' in ui && (
             <Box flexDirection="row" gap={2}>
               <ui.Raster key="globe" columns={globe.columns} rows={globe.rows} cells={encodeCells(globe.words)} />
               <Box flexDirection="column">
@@ -283,27 +352,14 @@ export const register: Register = on => {
                 <Text color={AMBER} bold={n % 4 < 2}>
                   {`⚠ ${LOAD_LABEL[load]}`}
                 </Text>
-                {load === 2 && <Text color={AMBER}>cargo freighter inbound</Text>}
+                {load === 2 && <Text color={AMBER}>recon drone on the cargo ship</Text>}
               </Box>
             </Box>
           )}
+          {lane}
+          {calling && <Text color={HOT} bold>{`☎ OPERATOR ▸ dispatching ${calling.type.toUpperCase()} · knock, knock`}</Text>}
+          {rabbit && RABBIT_TEXT.map((line, k) => <Text key={`r-${k}`} color={HOT}>{line}</Text>)}
         </Box>
-      )
-    } else if ('Svg' in ui) {
-      rain = (
-        <ui.Svg
-          source={rainSvg(width, height, 1, scene, load >= 1)}
-          alt={load >= 1 ? 'Code rain, a spinning pixel globe with orbiting satellites' + (load === 2 ? ' and a cargo ship flying by' : '') : 'Green code rain behind the words The Gibson'}
-          width={width}
-          height={height}
-          isInteractive
-        />
-      )
-    } else {
-      rain = (
-        <Text color={GREEN} bold>
-          {'░▒▓ THE GIBSON ▓▒░'}
-        </Text>
       )
     }
 
@@ -338,9 +394,9 @@ export const register: Register = on => {
 
     return (
       <Box flexDirection="column" gap={1}>
-        {rain}
+        {header}
         <Text color={GREEN}>
-          {`ROOT // uplink ${n % 4 < 2 ? '●' : '○'}  `}
+          {`ROOT // uplink ${n % 10 < 5 ? '●' : '○'}  `}
           <Text color={DIM}>
             {current ? `turn ${elapsed(now - current.startedAt)} · ` : 'idle · '}
             {live} daemon{live === 1 ? '' : 's'} online · load {LOAD_LABEL[load]}

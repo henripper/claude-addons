@@ -1,7 +1,9 @@
 import { expect, mock, test } from 'claude-code/testing'
 
-import { hackerWord, rainCells, rainSvg, shortTool, sweep } from '../hooks/gibson'
-import { globeCells, globeSvg, loadLevel, shipLane, shipSvg } from '../hooks/scenes'
+import { flybySvg } from '../hooks/flyby'
+import { hackerWord, shortTool, sweep, titleSvg } from '../hooks/gibson'
+import { nokiaSvg, rabbitSvg, wakeUpSvg } from '../hooks/matrix'
+import { globeCells, globePanelSvg, loadLevel, shipLane } from '../hooks/scenes'
 
 const AGENT = { id: 'a1', description: 'Find auth code', type: 'Explore', status: 'running' as const }
 const SITE = { bodyColumns: 80, scroll: { offset: 0, bodyRows: 30 }, view: {} }
@@ -13,8 +15,7 @@ test('drawing helpers stay in bounds', async () => {
   expect(sweep(5, 14).length).toBe(14)
   expect(hackerWord('thinking', 0)).toBe('DECRYPTING')
   expect(shortTool('Edit', { file_path: '/a/b/register.tsx' })).toBe('Edit register.tsx')
-  expect(rainCells(10, 4, 3).length).toBe(Math.ceil((10 * 4 * 12) / 3) * 4)
-  expect(rainSvg(400, 180).length).toBeLessThan(131072)
+  expect(titleSvg(400)).toContain('THE GIBSON')
 })
 
 test('band chip shows running daemons and keeps the other bands', async ($, on) => {
@@ -56,6 +57,22 @@ test('the pane draws a card per daemon on both surfaces', async ($, on) => {
   }
 })
 
+test('a new daemon rings the Nokia on both surfaces', async ($, on) => {
+  const clock = mock.clock(on)
+  on('agent.list', () => ({ value: [AGENT] }))
+  on('ui.open', () => ({ value: { isPlaced: true } }))
+  on('ui.toast', () => ({ value: undefined }))
+  await $.command.run(HACK)
+  await clock.advance(1100)
+
+  const terminal = await $.ui.mount({ plugin: 'hack-the-planet', surface: 'terminal', component: 'Pane', requestId: 'gibson', props: PANE })
+  expect(await terminal.find({ type: 'Text', text: /OPERATOR/ })).toBeDefined()
+  await terminal.unmount()
+  const desktop = await $.ui.mount({ plugin: 'hack-the-planet', surface: 'desktop', component: 'Pane', requestId: 'gibson', props: PANE })
+  expect(await desktop.find({ key: 'call-a1' })).toBeDefined()
+  await desktop.unmount()
+})
+
 test('the spinner speaks hacker', async $ => {
   const ui = await $.ui.mount({
     plugin: 'hack-the-planet',
@@ -72,8 +89,11 @@ test('load levels and scene sizes', async () => {
   expect(loadLevel(2, 0, 0)).toBe(1)
   expect(loadLevel(0, 2500, 0)).toBe(2)
   expect(loadLevel(0, 0, 30)).toBe(2)
-  const scene = globeSvg(630, 112, 62, 6) + shipSvg(720, 168)
-  expect(rainSvg(720, 240, 1, scene, true).length).toBeLessThan(131072)
+  // Every Svg source must stay under the engine's 131072 characters at the widest pane.
+  for (const svg of [flybySvg(720, 330, 99), globePanelSvg(720, 200, 6), nokiaSvg(720, 'general-purpose', 'x'.repeat(200)), rabbitSvg(720, 'Explore', '14s'), wakeUpSvg(720)]) {
+    expect(svg.length).toBeLessThan(131072)
+  }
+  expect(flybySvg(320, 330, 1).length).toBeLessThan(131072)
   const globe = globeCells(9, 5, 3)
   expect(globe.words.length).toBe(globe.columns * globe.rows * 3)
   expect(shipLane(4, 12).length).toBe(12)
