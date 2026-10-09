@@ -1,6 +1,6 @@
-// Matrix moments, as one-shot SMIL SVGs that play once when drawn: the Nokia 8110
-// sliding open when a daemon is dispatched, the white rabbit diving down its hole when
-// one finishes, and the "Wake up, Neo" intro when The Gibson opens.
+// Matrix moments, as one-shot SMIL SVGs that play once when drawn: the white rabbit
+// diving down its hole when a daemon finishes, and the "Wake up, Neo" intro when The
+// Gibson opens.
 
 import { AMBER, DIM, GREEN, HOT } from './gibson'
 
@@ -66,44 +66,6 @@ export function rabbitSvg(w: number, type: string, elapsed: string): string {
     `<g font-family="${MONO}" font-size="12">` +
     typed('rt1', 14, 22, 'Follow the white rabbit.', 0.3, `fill="${GREEN}"`) +
     typed('rt2', 14, 42, `${type.toUpperCase()} daemon went down the hole: ACCESS GRANTED (${elapsed})`, 2.1, `fill="${AMBER}" font-weight="bold"`, 7.2) +
-    `</g></svg>`
-  )
-}
-
-/** The Nokia 8110 sliding in and snapping open, the operator on the line. */
-export function nokiaSvg(w: number, type: string, description: string): string {
-  const h = 186
-  const keys = Array.from({ length: 12 }, (_, i) => {
-    const x = 9 + (i % 3) * 11
-    const y = 63 + Math.floor(i / 3) * 8.5
-    return `<rect x="${x}" y="${y}" width="9" height="6.5" rx="2.5" fill="#c9d0d6" stroke="#7fe8a0" stroke-opacity="0.5" stroke-width="0.5"/>`
-  }).join('')
-  const phone =
-    // The banana: a curved black body, its earpiece and screen, the keypad under the slider.
-    `<path d="M6 8Q28 -2 50 8L52 60Q54 96 44 112Q28 122 12 112Q2 96 4 60Z" fill="#15181b" stroke="#3b4248"/>` +
-    `<rect x="20" y="13" width="18" height="2" rx="1" fill="#3b4248"/>` +
-    `<rect x="12" y="20" width="34" height="26" rx="3" fill="#6d8f45"><animate attributeName="fill" values="#2a3a1c;#a8d86a" begin="0.85s" dur="0.15s" fill="freeze"/></rect>` +
-    `<text x="29" y="31" font-family="${MONO}" font-size="5.5" fill="#1b2a10" text-anchor="middle" opacity="0">OPERATOR<set attributeName="opacity" to="1" begin="0.95s" dur="indefinite"/></text>` +
-    `<text x="29" y="40" font-family="${MONO}" font-size="4.5" fill="#1b2a10" text-anchor="middle" opacity="0">calling…<set attributeName="opacity" to="1" begin="1.1s" dur="indefinite"/>` +
-    `<animate attributeName="opacity" values="1;0.2;1" begin="1.1s" dur="0.8s" repeatCount="indefinite"/></text>` +
-    `<g opacity="0.95">${keys}<animate attributeName="opacity" values="0.4;1" begin="0.7s" dur="0.2s" fill="freeze"/></g>` +
-    // The slider: covers the keypad, then drops with a spring and a snap.
-    `<g><path d="M5 56Q29 52 53 56L52 70Q50 100 42 108Q29 115 16 108Q7 100 6 70Z" fill="#202428" stroke="#4a535b"/>` +
-    `<path d="M14 98Q29 104 44 98" fill="none" stroke="#4a535b" stroke-width="1.5"/>` +
-    `<animateTransform attributeName="transform" type="translate" values="0 0;0 0;0 56;0 47;0 50" keyTimes="0;0.3;0.7;0.85;1" begin="0.35s" dur="0.55s" fill="freeze"/></g>`
-  const lines = [
-    { text: '☎ INCOMING CALL', at: 1.0, attrs: `fill="${HOT}" font-weight="bold" font-size="13"` },
-    { text: `> Operator: dispatching ${type.toUpperCase()} daemon`, at: 1.5, attrs: `fill="${GREEN}"` },
-    { text: `> "${description.slice(0, 44)}"`, at: 2.4, attrs: `fill="${DIM}"` },
-    { text: '> Knock, knock.', at: 3.4, attrs: `fill="${GREEN}" font-weight="bold"` },
-  ]
-  return (
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">` +
-    `<rect width="${w}" height="${h}" fill="#020a04"/>` +
-    `<g transform="translate(26 10)"><g>${phone}` +
-    `<animateTransform attributeName="transform" type="translate" values="-90 0;6 0;0 0" keyTimes="0;0.7;1" dur="0.4s" fill="freeze"/></g></g>` +
-    `<g font-family="${MONO}" font-size="12">` +
-    lines.map((line, i) => typed(`nk${i}`, 108, 50 + i * 26, line.text, line.at, line.attrs)).join('') +
     `</g></svg>`
   )
 }

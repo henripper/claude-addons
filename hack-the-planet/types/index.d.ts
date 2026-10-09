@@ -11,6 +11,8 @@ export type Daemon = {
   endedAt: number
 }
 
+export type Browsing = { at: number; target: string } | null
+
 export type Turn = { startedAt: number; promptChars: number; toolCalls: number } | null
 
 declare module 'claude-code' {
@@ -21,6 +23,7 @@ declare module 'claude-code' {
       frame: number
       second: number
       openedAt: number
+      browsing: Browsing
       turn: Turn
       isPaneOpen: boolean
       isSpinnerOn: boolean

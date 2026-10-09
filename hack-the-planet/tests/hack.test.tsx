@@ -2,7 +2,8 @@ import { expect, mock, test } from 'claude-code/testing'
 
 import { flybySvg } from '../hooks/flyby'
 import { hackerWord, shortTool, sweep, titleSvg } from '../hooks/gibson'
-import { nokiaSvg, rabbitSvg, wakeUpSvg } from '../hooks/matrix'
+import { eyeCells, eyeSvg, eyeTarget } from '../hooks/eye'
+import { rabbitSvg, wakeUpSvg } from '../hooks/matrix'
 import { globeCells, globePanelSvg, loadLevel, shipLane } from '../hooks/scenes'
 
 const AGENT = { id: 'a1', description: 'Find auth code', type: 'Explore', status: 'running' as const }
@@ -57,20 +58,28 @@ test('the pane draws a card per daemon on both surfaces', async ($, on) => {
   }
 })
 
-test('a new daemon rings the Nokia on both surfaces', async ($, on) => {
+test('browsing summons the Eye of Sauron on both surfaces', async ($, on) => {
   const clock = mock.clock(on)
-  on('agent.list', () => ({ value: [AGENT] }))
   on('ui.open', () => ({ value: { isPlaced: true } }))
-  on('ui.toast', () => ({ value: undefined }))
+  on('tool.call', () => ({ result: 'ok' }) as never)
+  on('ui.log', () => ({ value: undefined }))
+  on('ui.render', { component: 'AbovePrompt' }, ($, e) => {
+    const { Text } = $.ui.resolve(e)
+    return <Text key="usage">Session 42%</Text>
+  })
   await $.command.run(HACK)
-  await clock.advance(1100)
+  await $.tool.call({ tool: 'mcp__Claude_Browser__navigate', url: 'https://example.com/docs' } as never)
+  await clock.advance(300)
 
-  const terminal = await $.ui.mount({ plugin: 'hack-the-planet', surface: 'terminal', component: 'Pane', requestId: 'gibson', props: PANE })
-  expect(await terminal.find({ type: 'Text', text: /OPERATOR/ })).toBeDefined()
-  await terminal.unmount()
-  const desktop = await $.ui.mount({ plugin: 'hack-the-planet', surface: 'desktop', component: 'Pane', requestId: 'gibson', props: PANE })
-  expect(await desktop.find({ key: 'call-a1' })).toBeDefined()
-  await desktop.unmount()
+  for (const surface of ['terminal', 'desktop'] as const) {
+    const pane = await $.ui.mount({ plugin: 'hack-the-planet', surface, component: 'Pane', requestId: 'gibson', props: PANE })
+    expect(await pane.find({ type: 'Text', text: /example\.com/ })).toBeDefined()
+    await pane.unmount()
+    const band = await $.ui.mount({ plugin: 'hack-the-planet', surface, component: 'AbovePrompt', props: BAND })
+    expect(await band.find({ type: 'Text', text: /example\.com/ })).toBeDefined()
+    expect(await band.find({ type: 'Text', text: /Session 42%/ })).toBeDefined()
+    await band.unmount()
+  }
 })
 
 test('the spinner speaks hacker', async $ => {
@@ -90,13 +99,16 @@ test('load levels and scene sizes', async () => {
   expect(loadLevel(0, 2500, 0)).toBe(2)
   expect(loadLevel(0, 0, 30)).toBe(2)
   // Every Svg source must stay under the engine's 131072 characters at the widest pane.
-  for (const svg of [flybySvg(720, 330, 99), globePanelSvg(720, 200, 6), nokiaSvg(720, 'general-purpose', 'x'.repeat(200)), rabbitSvg(720, 'Explore', '14s'), wakeUpSvg(720)]) {
+  for (const svg of [flybySvg(720, 330, 99), globePanelSvg(720, 200, 6), eyeSvg(5, true), eyeSvg(1, false), rabbitSvg(720, 'Explore', '14s'), wakeUpSvg(720)]) {
     expect(svg.length).toBeLessThan(131072)
   }
   expect(flybySvg(320, 330, 1).length).toBeLessThan(131072)
   const globe = globeCells(9, 5, 3)
   expect(globe.words.length).toBe(globe.columns * globe.rows * 3)
   expect(shipLane(4, 12).length).toBe(12)
+  expect(eyeTarget('mcp__Claude_Browser__navigate', { url: 'https://a.b.com/x?y' })).toBe('a.b.com')
+  const eye = eyeCells(7, true)
+  expect(eye.words.length).toBe(eye.columns * eye.rows * 3)
 })
 
 test('three daemons bring the globe and the cargo ship on both surfaces', async ($, on) => {

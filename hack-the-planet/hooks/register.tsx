@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { AgentInfo, EngineInterface, Register } from 'claude-code'
 
-import type { Daemon, Turn } from '../types'
+import type { Browsing, Daemon, Turn } from '../types'
 import {
   AMBER,
   DIM,
@@ -19,7 +19,8 @@ import {
   titleSvg,
 } from './gibson'
 import { flybySvg } from './flyby'
-import { RABBIT_TEXT, nokiaSvg, rabbitSvg, wakeUpSvg } from './matrix'
+import { EYE_MS, eyeCells, eyeSvg, eyeTarget, isBrowserTool } from './eye'
+import { RABBIT_TEXT, rabbitSvg, wakeUpSvg } from './matrix'
 import { blank, globeCells, globePanelSvg, loadLevel, paintShip, shipLane } from './scenes'
 import type { Load } from './scenes'
 
@@ -29,7 +30,6 @@ const FRAME_MS = 200
 const POLL_MS = 1000
 const LINGER_MS = 8000
 const GLITCH_MS = 1600
-const CALL_MS = 5000
 const RABBIT_MS = 5000
 const INTRO_MS = 9500
 const FEED_MAX = 40
@@ -40,6 +40,10 @@ const frame = atom({ plugin: 'hack-the-planet', key: 'frame' } as const, 0)
 // The desktop pane redraws once a second, not every frame: its SVGs animate themselves.
 const second = atom({ plugin: 'hack-the-planet', key: 'second' } as const, 0)
 const openedAt = atom({ plugin: 'hack-the-planet', key: 'openedAt' } as const, 0)
+const browsing = atom({ plugin: 'hack-the-planet', key: 'browsing' } as const, null as Browsing)
+
+const isEyeOpen = (eye: Browsing) => !!eye && Date.now() - eye.at < EYE_MS
+const EYE_WORDS = ['THE EYE IS WATCHING', 'ONE TAB TO RULE THEM ALL', 'SCRYING THE WEB', 'THE EYE SEES ALL']
 const turn = atom({ plugin: 'hack-the-planet', key: 'turn' } as const, null as Turn)
 const isPaneOpen = atom({ plugin: 'hack-the-planet', key: 'isPaneOpen' } as const, false)
 const isSpinnerOn = atom({ plugin: 'hack-the-planet', key: 'isSpinnerOn' } as const, true)
@@ -58,6 +62,7 @@ function levelOf(list: readonly Daemon[], current: Turn): Load {
 }
 
 const LOAD_LABEL = ['NOMINAL', 'BUSY', 'HEAVY TRAFFIC'] as const
+const EYE_ORANGE = '#ff7a1a'
 
 async function openPane($: EngineInterface): Promise<void> {
   const wasOpen = await read($, isPaneOpen)
@@ -116,7 +121,6 @@ async function poll($: EngineInterface): Promise<void> {
     }
 
     if (JSON.stringify(next) !== JSON.stringify(before)) await update($, daemons, () => next)
-    for (const one of started) $.ui.toast(`☎ Operator: ${one.type.toUpperCase()} daemon is in. Knock, knock.`)
     for (const one of finished) {
       const took = elapsed(one.endedAt - one.startedAt)
       $.ui.toast(
@@ -134,8 +138,8 @@ async function poll($: EngineInterface): Promise<void> {
 
 /** Advances the animation only while something is on screen to animate. */
 async function tick($: EngineInterface): Promise<void> {
-  const [running, open, list] = await Promise.all([read($, turn), read($, isPaneOpen), read($, daemons)])
-  if (running || open || list.length > 0) {
+  const [running, open, list, eye] = await Promise.all([read($, turn), read($, isPaneOpen), read($, daemons), read($, browsing)])
+  if (running || open || list.length > 0 || (eye && Date.now() - eye.at < EYE_MS + 2000)) {
     const n = await update($, frame, k => k + 1)
     if (typeof n === 'number' && n % 5 === 0) await update($, second, k => k + 1)
   }
@@ -207,6 +211,10 @@ export const register: Register = on => {
     void update($, feed, lines => [...lines, entry].slice(-FEED_MAX))
     void update($, turn, now => (now ? { ...now, toolCalls: now.toolCalls + 1 } : now))
     if (agentId) void update($, daemons, all => all.map(one => (one.id === agentId ? { ...one, tool: line } : one)))
+    if (isBrowserTool(e.tool)) {
+      const target = eyeTarget(e.tool, e as unknown as Record<string, unknown>)
+      void update($, browsing, eye => ({ at: Date.now(), target: target.includes('.') || !eye ? target : eye.target }))
+    }
     const result = await next(e)
     if (e.tool === 'Agent') void poll($)
     return result
@@ -214,10 +222,11 @@ export const register: Register = on => {
 
   on('ui.render', { component: 'Spinner' }, async ($, e, next) => {
     if (!(await read($, isSpinnerOn))) return next(e)
-    const [n, current, list] = await Promise.all([read($, frame), read($, turn), read($, daemons)])
+    const [n, current, list, eye] = await Promise.all([read($, frame), read($, turn), read($, daemons), read($, browsing)])
     const { Box, Text } = $.ui.resolve(e)
     const live = list.filter(one => one.status === 'running').length
-    const word = hackerWord(e.props.mode, n)
+    const isEye = isEyeOpen(eye)
+    const word = isEye ? EYE_WORDS[Math.floor(n / 15) % EYE_WORDS.length]! : hackerWord(e.props.mode, n)
     const cursor = n % 4 < 2 ? '_' : ' '
     const since = current ? elapsed(Date.now() - current.startedAt) : '0s'
     const tail = live > 0 ? ` · ${live} daemon${live === 1 ? '' : 's'}` : ''
@@ -225,8 +234,8 @@ export const register: Register = on => {
 
     return (
       <Box flexDirection="row" gap={1}>
-        <Text color={HOT} bold>
-          {`> ${word}${cursor}`}
+        <Text color={isEye ? EYE_ORANGE : HOT} bold>
+          {`${isEye ? '◉' : '>'} ${word}${cursor}`}
         </Text>
         <Text color={GREEN}>{`[${sweep(n, 14)}]`}</Text>
         <Text color={DIM}>{`${hex(Math.floor(n / 2))} · ${since}${tail}`}</Text>
@@ -242,29 +251,42 @@ export const register: Register = on => {
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     if (e.props.hasSurvey) return next(e)
-    const [list, current] = await Promise.all([read($, daemons), read($, turn)])
+    const [list, current, eye] = await Promise.all([read($, daemons), read($, turn), read($, browsing)])
     const live = list.filter(one => one.status === 'running').length
     const load = levelOf(list, current)
-    if (live === 0 && load === 0) return next(e)
+    const isEye = isEyeOpen(eye)
+    if (live === 0 && load === 0 && !isEye) return next(e)
 
     const [n, open] = await Promise.all([read($, frame), read($, isPaneOpen)])
-    const { Box, Text, Button } = $.ui.resolve(e)
+    const ui = $.ui.resolve(e)
+    const { Box, Text, Button } = ui
     // The band has one slot: keep what the other plugins (servers, usage-band) draw beneath us.
     const beneath = await next(e)
 
     return (
       <Box flexDirection="column">
         {beneath}
-        <Box flexDirection="row" gap={1}>
-          <Text color={GREEN} bold>
-            {n % 6 < 3 ? '◉' : '○'} ICE {live}
-          </Text>
-          <Text color={DIM}>
-            {live === 1 ? 'daemon' : 'daemons'} breaching the mainframe
-          </Text>
-          {load >= 1 && <Text color={AMBER} bold={n % 4 < 2}>{`⚠ ${LOAD_LABEL[load]}`}</Text>}
-          {!open && <Button key="jack-in" plain dimColor label="Jack in" onPress={() => openPane($)} />}
-        </Box>
+        {(live > 0 || load > 0) && (
+          <Box flexDirection="row" gap={1}>
+            <Text color={GREEN} bold>
+              {n % 6 < 3 ? '◉' : '○'} ICE {live}
+            </Text>
+            <Text color={DIM}>
+              {live === 1 ? 'daemon' : 'daemons'} breaching the mainframe
+            </Text>
+            {load >= 1 && <Text color={AMBER} bold={n % 4 < 2}>{`⚠ ${LOAD_LABEL[load]}`}</Text>}
+            {!open && <Button key="jack-in" plain dimColor label="Jack in" onPress={() => openPane($)} />}
+          </Box>
+        )}
+        {isEye && eye && (
+          <Box key="eye-row" flexDirection="row" gap={1} alignItems="center">
+            {e.surface !== 'terminal' && 'Svg' in ui && <ui.Svg source={eyeSvg(1, false)} alt="The Eye of Sauron" width={60} height={26} isInteractive />}
+            <Text color={EYE_ORANGE} bold>
+              {e.surface === 'terminal' ? (n % 6 < 3 ? '◉' : '◎') + ' ' : ''}THE EYE IS UPON
+            </Text>
+            <Text color={HOT}>{eye.target}</Text>
+          </Box>
+        )}
       </Box>
     )
   })
@@ -273,7 +295,8 @@ export const register: Register = on => {
     const isTerminal = e.surface === 'terminal'
     // The terminal animates by redrawing; the desktop's SVGs animate themselves, so it redraws per second.
     const n = isTerminal ? await read($, frame) : (await read($, second)) * 5
-    const [list, lines, current, opened] = await Promise.all([read($, daemons), read($, feed), read($, turn), read($, openedAt)])
+    const [list, lines, current, opened, eye] = await Promise.all([read($, daemons), read($, feed), read($, turn), read($, openedAt), read($, browsing)])
+    const isEye = isEyeOpen(eye)
     const ui = $.ui.resolve(e)
     const { Box, Text, Button } = ui
     const columns = Math.max(20, e.props.bodyColumns)
@@ -283,7 +306,6 @@ export const register: Register = on => {
     const load = levelOf(list, current)
     const width = Math.min(columns * 8, 720)
 
-    const calling = [...list].reverse().find(one => one.status === 'running' && now - one.startedAt < CALL_MS)
     const rabbit = [...list].reverse().find(one => one.status === 'granted' && now - one.endedAt < RABBIT_MS)
     const isIntro = opened > 0 && now - opened < INTRO_MS
 
@@ -293,7 +315,7 @@ export const register: Register = on => {
       header = (
         <Box flexDirection="column" gap={1}>
           <Box key="title">
-            <ui.Svg source={titleSvg(width)} alt="The Gibson. Hack the planet." width={width} height={70} isInteractive />
+            <ui.Svg source={titleSvg(width)} alt="Green code rain behind the words The Gibson" width={width} height={180} isInteractive />
           </Box>
           {isIntro && (
             <Box key={`intro-${opened}`}>
@@ -310,9 +332,12 @@ export const register: Register = on => {
               <ui.Svg source={globePanelSvg(width, 200, live)} alt={`A spinning globe with ${live} satellites`} width={width} height={200} isInteractive />
             </Box>
           )}
-          {calling && (
-            <Box key={`call-${calling.id}`}>
-              <ui.Svg source={nokiaSvg(width, calling.type, calling.description)} alt={`Incoming call: the operator dispatches the ${calling.type} daemon`} width={width} height={140} isInteractive />
+          {isEye && eye && (
+            <Box key="eye" flexDirection="column" alignItems="center">
+              <ui.Svg source={eyeSvg(5, true)} alt="The Eye of Sauron atop Barad-dûr" width={300} height={220} isInteractive />
+              <Text color={EYE_ORANGE} bold>
+                THE EYE IS UPON <Text color={HOT}>{eye.target}</Text>
+              </Text>
             </Box>
           )}
           {rabbit && (
@@ -357,7 +382,17 @@ export const register: Register = on => {
             </Box>
           )}
           {lane}
-          {calling && <Text color={HOT} bold>{`☎ OPERATOR ▸ dispatching ${calling.type.toUpperCase()} · knock, knock`}</Text>}
+          {isEye && eye && 'Raster' in ui && (() => {
+            const pix = eyeCells(n, true)
+            return (
+              <Box flexDirection="column">
+                <ui.Raster key="eye" columns={pix.columns} rows={pix.rows} cells={encodeCells(pix.words)} />
+                <Text color={EYE_ORANGE} bold>
+                  THE EYE IS UPON <Text color={HOT}>{eye.target}</Text>
+                </Text>
+              </Box>
+            )
+          })()}
           {rabbit && RABBIT_TEXT.map((line, k) => <Text key={`r-${k}`} color={HOT}>{line}</Text>)}
         </Box>
       )
