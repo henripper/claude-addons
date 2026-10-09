@@ -18,7 +18,7 @@ import {
   cellLines,
 } from './gibson'
 import { EYE_MS, eyeLines, eyeTarget, isBrowserTool } from './eye'
-import { rabbitFrame } from './matrix'
+import { RABBIT_FRAME_MS, rabbitFrame } from './matrix'
 import { blank, globeCells, loadLevel, paintShip, shipLane } from './scenes'
 import type { Load } from './scenes'
 
@@ -28,13 +28,15 @@ const FRAME_MS = 200
 const POLL_MS = 1000
 const LINGER_MS = 8000
 const GLITCH_MS = 1600
-const RABBIT_MS = 5000
+const RABBIT_MS = 3500
 const FEED_MAX = 40
 
 const daemons = atom({ plugin: 'hack-the-planet', key: 'daemons' } as const, [] as Daemon[])
 const feed = atom({ plugin: 'hack-the-planet', key: 'feed' } as const, [] as string[])
 const frame = atom({ plugin: 'hack-the-planet', key: 'frame' } as const, 0)
 // The desktop pane redraws once a second, not every frame: its SVGs animate themselves.
+// The rabbit's own frame counter: it runs on a faster clock than everything else.
+const hop = atom({ plugin: 'hack-the-planet', key: 'hop' } as const, 0)
 const second = atom({ plugin: 'hack-the-planet', key: 'second' } as const, 0)
 const browsing = atom({ plugin: 'hack-the-planet', key: 'browsing' } as const, null as Browsing)
 
@@ -130,6 +132,14 @@ async function poll($: EngineInterface): Promise<void> {
   }
 }
 
+/** Advances the rabbit's frames while one is running, from how long ago its daemon finished. */
+async function hopTick($: EngineInterface): Promise<void> {
+  const list = await read($, daemons)
+  const now = Date.now()
+  const rabbit = [...list].reverse().find(one => one.status === 'granted' && now - one.endedAt < RABBIT_MS)
+  if (rabbit) await update($, hop, () => Math.floor((now - rabbit.endedAt) / RABBIT_FRAME_MS))
+}
+
 /** Advances the animation only while something is on screen to animate. */
 async function tick($: EngineInterface): Promise<void> {
   const [running, open, list, eye] = await Promise.all([read($, turn), read($, isPaneOpen), read($, daemons), read($, browsing)])
@@ -158,6 +168,7 @@ export const register: Register = on => {
     await update($, isPaneOpen, () => isUp)
     $.clock.every(FRAME_MS, () => void tick($))
     $.clock.every(POLL_MS, () => void poll($))
+    $.clock.every(RABBIT_FRAME_MS, () => void hopTick($))
     return next(e)
   })
 
@@ -294,6 +305,7 @@ export const register: Register = on => {
     // Redraw every frame only while cell pixel art is moving; otherwise once a second, so the pane stays calm.
     const now = Date.now()
     const rabbit = [...list].reverse().find(one => one.status === 'granted' && now - one.endedAt < RABBIT_MS)
+    const rabbitAt = rabbit ? await read($, hop) : 0
     const isMoving = isEye || !!rabbit || levelOf(list, current) >= 1
     const n = isMoving ? await read($, frame) : (await read($, second)) * 5
     const columns = Math.max(20, e.props.bodyColumns)
@@ -361,7 +373,7 @@ export const register: Register = on => {
               <Text color={GREEN} bold>
                 Follow the white rabbit.
               </Text>
-              {rabbitFrame(Math.floor((now - rabbit.endedAt) / FRAME_MS), columns).map((line, k) => (
+              {rabbitFrame(rabbitAt, columns).map((line, k) => (
                 <Text key={`r-${k}`} color="#f4f8f6">
                   {line || ' '}
                 </Text>

@@ -22,6 +22,7 @@ declare module 'claude-code' {
       feed: string[]
       frame: number
       second: number
+      hop: number
       browsing: Browsing
       turn: Turn
       isPaneOpen: boolean
