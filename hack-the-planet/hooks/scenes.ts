@@ -1,7 +1,6 @@
 // Heavy-traffic scenes: a spinning pixel globe and a cargo freighter flyby.
-// Pure like gibson.ts: the terminal gets cell grids, the desktop SMIL-animated SVG.
+// Pure like gibson.ts: cell grids, drawn as a Raster or as colored text.
 
-import { DIM, GREEN, HOT } from './gibson'
 
 export type Load = 0 | 1 | 2
 
@@ -137,83 +136,4 @@ export function shipLane(frame: number, width: number): string {
     if (i >= 0 && i < width) lane[i] = ch
   })
   return lane.join('')
-}
-
-/** One path of unit squares per row run, so a pixel picture stays a few kilobytes. */
-function runsPath(rows: string[], pick: (ch: string) => boolean): string {
-  let d = ''
-  rows.forEach((row, y) => {
-    let x = 0
-    while (x < row.length) {
-      if (!pick(row[x]!)) {
-        x++
-        continue
-      }
-      const start = x
-      while (x < row.length && pick(row[x]!)) x++
-      d += `M${start} ${y}h${x - start}v1h${start - x}z`
-    }
-  })
-  return d
-}
-
-const FRAMES = 12
-const GRID = 26
-
-/** The desktop's globe: twelve pre-turned frames shown in turn, plus one satellite per daemon. */
-export function globeSvg(cx: number, cy: number, radius: number, satellites: number): string {
-  const px = (radius * 2) / GRID
-  const frames: string[] = []
-  for (let f = 0; f < FRAMES; f++) {
-    const rot = (f / FRAMES) * Math.PI * 2
-    const front: string[] = []
-    const back: string[] = []
-    for (let y = 0; y < GRID; y++) {
-      let rowFront = ''
-      let rowBack = ''
-      for (let x = 0; x < GRID; x++) {
-        const hit = project((x + 0.5 - GRID / 2) / (GRID / 2), (y + 0.5 - GRID / 2) / (GRID / 2), rot)
-        rowFront += hit?.land && hit.z > 0.4 ? '#' : ' '
-        rowBack += hit?.land && hit.z <= 0.4 ? '#' : ' '
-      }
-      front.push(rowFront)
-      back.push(rowBack)
-    }
-    const values = f === 0 ? 'values="1;0" keyTimes="0;' + (1 / FRAMES).toFixed(4) + '"' : `values="0;1;0" keyTimes="0;${(f / FRAMES).toFixed(4)};${((f + 1) / FRAMES).toFixed(4)}"`
-    frames.push(
-      `<g opacity="${f === 0 ? 1 : 0}"><path fill="${DIM}" d="${runsPath(back, c => c === '#')}"/>` +
-        `<path fill="${GREEN}" d="${runsPath(front, c => c === '#')}"/>` +
-        `<animate attributeName="opacity" ${values} calcMode="discrete" dur="4.8s" repeatCount="indefinite"/></g>`,
-    )
-  }
-  const orbits: string[] = []
-  for (let s = 0; s < Math.min(6, satellites); s++) {
-    const rx = radius + 14 + s * 6
-    const ry = (radius + 14 + s * 6) * 0.32
-    const tilt = -18 + s * 9
-    const dur = (5 + s * 1.3).toFixed(1)
-    const path = `M${-rx} 0a${rx} ${ry} 0 1 0 ${rx * 2} 0a${rx} ${ry} 0 1 0 ${-rx * 2} 0`
-    orbits.push(
-      `<g transform="translate(${cx} ${cy}) rotate(${tilt})">` +
-        `<path d="${path}" fill="none" stroke="${DIM}" stroke-opacity="0.35" stroke-dasharray="2 4"/>` +
-        `<rect x="-3" y="-3" width="6" height="6" fill="${HOT}"><animateMotion dur="${dur}s" repeatCount="indefinite" path="${path}"/></rect></g>`,
-    )
-  }
-  return (
-    `<circle cx="${cx}" cy="${cy}" r="${radius + 6}" fill="none" stroke="${GREEN}" stroke-opacity="0.25" stroke-width="6">` +
-    `<animate attributeName="stroke-opacity" values="0.1;0.35;0.1" dur="2.4s" repeatCount="indefinite"/></circle>` +
-    `<circle cx="${cx}" cy="${cy}" r="${radius}" fill="#03150a" stroke="${GREEN}" stroke-width="1.5"/>` +
-    `<g transform="translate(${cx - radius} ${cy - radius}) scale(${px.toFixed(3)})">${frames.join('')}</g>` +
-    `<text x="${cx}" y="${cy + radius + 22}" text-anchor="middle" font-size="10" fill="${DIM}" letter-spacing="2">GLOBAL UPLINK · ${satellites} SAT</text>` +
-    orbits.join('')
-  )
-}
-
-/** The globe on its own dark panel, for the desktop's busy level. */
-export function globePanelSvg(w: number, h: number, satellites: number): string {
-  return (
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">` +
-    `<rect width="100%" height="100%" fill="#020a04"/>` +
-    `<g font-family="ui-monospace, Menlo, monospace">${globeSvg(w / 2, h / 2 - 8, Math.min(70, h / 2 - 30), satellites)}</g></svg>`
-  )
 }

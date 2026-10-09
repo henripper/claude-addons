@@ -1,10 +1,9 @@
 import { expect, mock, test } from 'claude-code/testing'
 
-import { flybySvg } from '../hooks/flyby'
 import { cellRuns, hackerWord, shortTool, sweep } from '../hooks/gibson'
-import { eyeCells, eyeSvg, eyeTarget } from '../hooks/eye'
-import { rabbitSvg } from '../hooks/matrix'
-import { globeCells, globePanelSvg, loadLevel, shipLane } from '../hooks/scenes'
+import { eyeCells, eyeTarget } from '../hooks/eye'
+import { rabbitFrame } from '../hooks/matrix'
+import { globeCells, loadLevel, shipLane } from '../hooks/scenes'
 
 const AGENT = { id: 'a1', description: 'Find auth code', type: 'Explore', status: 'running' as const }
 const SITE = { bodyColumns: 80, scroll: { offset: 0, bodyRows: 30 }, view: {} }
@@ -99,11 +98,8 @@ test('load levels and scene sizes', async () => {
   expect(loadLevel(2, 0, 0)).toBe(1)
   expect(loadLevel(0, 2500, 0)).toBe(2)
   expect(loadLevel(0, 0, 30)).toBe(2)
-  // Every Svg source must stay under the engine's 131072 characters at the widest pane.
-  for (const svg of [flybySvg(720, 330, 99), globePanelSvg(720, 200, 6), eyeSvg(5, true), eyeSvg(1, false), rabbitSvg(720, 'Explore', '14s')]) {
-    expect(svg.length).toBeLessThan(131072)
-  }
-  expect(flybySvg(320, 330, 1).length).toBeLessThan(131072)
+  expect(rabbitFrame(0, 40)).toEqual(['', '', ' (\\(\\', ' ( -.-)', 'o_(")(")'])
+  expect(rabbitFrame(30, 40)).toEqual([])
   const globe = globeCells(9, 5, 3)
   expect(globe.words.length).toBe(globe.columns * globe.rows * 3)
   expect(shipLane(4, 12).length).toBe(12)

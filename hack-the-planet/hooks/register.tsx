@@ -18,10 +18,9 @@ import {
   sweep,
   cellRuns,
 } from './gibson'
-import { flybySvg } from './flyby'
-import { EYE_MS, eyeCells, eyeSvg, eyeTarget, isBrowserTool } from './eye'
-import { RABBIT_TEXT, rabbitSvg } from './matrix'
-import { blank, globeCells, globePanelSvg, loadLevel, paintShip, shipLane } from './scenes'
+import { EYE_MS, eyeCells, eyeTarget, isBrowserTool } from './eye'
+import { rabbitFrame } from './matrix'
+import { blank, globeCells, loadLevel, paintShip, shipLane } from './scenes'
 import type { Load } from './scenes'
 
 const PANE = 'gibson'
@@ -285,7 +284,6 @@ export const register: Register = on => {
         )}
         {isEye && eye && (
           <Box key="eye-row" flexDirection="row" gap={1} alignItems="center">
-            {e.surface !== 'terminal' && 'Svg' in ui && ui.Svg && <ui.Svg source={eyeSvg(1, false)} alt="The Eye of Sauron" width={60} height={26} isInteractive />}
             <Text color={EYE_ORANGE} bold>
               {(n % 6 < 3 ? '◉' : '◎') + ' '}THE EYE IS UPON
             </Text>
@@ -299,22 +297,20 @@ export const register: Register = on => {
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
     const ui = $.ui.resolve(e)
     const { Box, Text, Button } = ui
-    // Only a surface whose table really carries Svg (truthy, not merely listed) gets the SVG
-    // scenes, which animate themselves; everywhere else the pixel art is drawn in cells.
-    const Svg = e.surface !== 'terminal' && 'Svg' in ui ? ui.Svg : undefined
+    // Everything here is drawn in cells and text: the desktop rebuilds an Svg on each redraw,
+    // which flickers and restarts its animation, while colored characters redraw cleanly.
     const Raster = 'Raster' in ui ? ui.Raster : undefined
     const [list, lines, current, eye] = await Promise.all([read($, daemons), read($, feed), read($, turn), read($, browsing)])
     const isEye = isEyeOpen(eye)
     // Redraw every frame only while cell pixel art is moving; otherwise once a second, so the pane stays calm.
-    const isMoving = !Svg && (isEye || levelOf(list, current) >= 1)
+    const now = Date.now()
+    const rabbit = [...list].reverse().find(one => one.status === 'granted' && now - one.endedAt < RABBIT_MS)
+    const isMoving = isEye || !!rabbit || levelOf(list, current) >= 1
     const n = isMoving ? await read($, frame) : (await read($, second)) * 5
     const columns = Math.max(20, e.props.bodyColumns)
     const rows = e.props.scroll.bodyRows || e.viewport?.rows || 30
-    const now = Date.now()
     const live = list.filter(one => one.status === 'running').length
     const load = levelOf(list, current)
-    const width = Math.min(columns * 8, 720)
-    const rabbit = [...list].reverse().find(one => one.status === 'granted' && now - one.endedAt < RABBIT_MS)
 
     /** Pixel art from a cell grid: one Raster where the surface has it, else rows of colored Text. */
     const pixels = (key: string, cells: { columns: number; rows: number; words: Uint32Array }) =>
@@ -341,34 +337,7 @@ export const register: Register = on => {
     )
 
     let scenes
-    if (Svg) {
-      // Each Svg sits in a keyed Box, so a redraw keeps it mounted and its animation running.
-      scenes = (
-        <Box flexDirection="column" gap={1}>
-          {load === 2 && (
-            <Box key="flyby">
-              <Svg source={flybySvg(width, 330, live)} alt="Recon flyby of a cargo ship, ending on a scan of its bridge" width={width} height={330} isInteractive />
-            </Box>
-          )}
-          {load === 1 && (
-            <Box key="globe">
-              <Svg source={globePanelSvg(width, 200, live)} alt={`A spinning globe with ${live} satellites`} width={width} height={200} isInteractive />
-            </Box>
-          )}
-          {isEye && eye && (
-            <Box key="eye" flexDirection="column" alignItems="center">
-              <Svg source={eyeSvg(5, true)} alt="The Eye of Sauron atop Barad-dûr" width={300} height={220} isInteractive />
-              {eyeLine}
-            </Box>
-          )}
-          {rabbit && (
-            <Box key={`rabbit-${rabbit.id}`}>
-              <Svg source={rabbitSvg(width, rabbit.type, elapsed(rabbit.endedAt - rabbit.startedAt))} alt={`The white rabbit dives down its hole: ${rabbit.type} finished`} width={width} height={104} isInteractive />
-            </Box>
-          )}
-        </Box>
-      )
-    } else {
+    {
       let lane = null
       if (load === 2) {
         const cells = blank(columns, 3)
@@ -401,9 +370,12 @@ export const register: Register = on => {
           )}
           {rabbit && (
             <Box flexDirection="column">
-              {RABBIT_TEXT.map((line, k) => (
-                <Text key={`r-${k}`} color={HOT}>
-                  {line}
+              <Text color={GREEN} bold>
+                Follow the white rabbit.
+              </Text>
+              {rabbitFrame(Math.floor((now - rabbit.endedAt) / FRAME_MS), columns).map((line, k) => (
+                <Text key={`r-${k}`} color="#f4f8f6">
+                  {line || ' '}
                 </Text>
               ))}
             </Box>

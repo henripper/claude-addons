@@ -1,7 +1,6 @@
 // The Eye of Sauron, in pixels, for while Claude browses the web: a fiery almond eye
-// with a slit pupil that looks around, flames flickering in four frames, and on the
-// big version the horns of Barad-dûr. One grid feeds both the desktop's SVG and the
-// terminal's half-block cells.
+// with a slit pupil that looks around, flames flickering in four frames, and the horns
+// of Barad-dûr, drawn as half-block cells.
 
 import { hash } from './gibson'
 
@@ -103,61 +102,8 @@ function pupil(shift: number, wide: boolean): [number, number][] {
   return out
 }
 
-/** One path of unit squares per row run of `color`. */
-function runs(cells: Grid, color: string): string {
-  let d = ''
-  cells.forEach((row, y) => {
-    let x = 0
-    while (x < row.length) {
-      if (row[x] !== color) {
-        x++
-        continue
-      }
-      const start = x
-      while (x < row.length && row[x] === color) x++
-      d += `M${start} ${y}h${x - start}v1h${start - x}z`
-    }
-  })
-  return d
-}
-
-function paths(cells: Grid): string {
-  const colors = new Set(cells.flat().filter((c): c is string => !!c))
-  return [...colors].map(color => `<path fill="${color}" d="${runs(cells, color)}"/>`).join('')
-}
-
 // Where the pupil looks over its 8-second cycle, and when it dilates.
 const GAZE = [0, 0, -5, -5, -5, 4, 4, 0, 0, 2, -2, 0]
-
-/** The eye as an SVG `px` CSS pixels per grid pixel; with the tower it is 60 by 44 pixels, else 60 by 26. */
-export function eyeSvg(px: number, withTower: boolean): string {
-  const rows = withTower ? H : 26
-  const w = W * px
-  const h = rows * px
-  const flames = Array.from({ length: FLAME_FRAMES }, (_, f) => {
-    const cells: Grid = Array.from({ length: rows }, (_, y) => Array.from({ length: W }, (_, x) => flame(x, y, f)))
-    const values = Array.from({ length: FLAME_FRAMES }, (_, k) => (k === f ? 1 : 0)).join(';')
-    return `<g opacity="${f === 0 ? 1 : 0}">${paths(cells)}<animate attributeName="opacity" values="${values}" calcMode="discrete" dur="0.6s" repeatCount="indefinite"/></g>`
-  }).join('')
-  const pupils = [false, true]
-    .map((wide, i) => {
-      const cells: Grid = Array.from({ length: rows }, () => Array.from({ length: W }, () => null))
-      for (const [x, y] of pupil(0, wide)) if (cells[y]) cells[y]![x] = '#120200'
-      return `<g opacity="${i === 0 ? 1 : 0}">${paths(cells)}<animate attributeName="opacity" values="${wide ? '0;0;1;1;0' : '1;1;0;0;1'}" keyTimes="0;0.55;0.6;0.85;1" calcMode="discrete" dur="8s" repeatCount="indefinite"/></g>`
-    })
-    .join('')
-  const gaze = GAZE.map(dx => `${dx} 0`).join(';')
-  return (
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${W} ${rows}" shape-rendering="crispEdges">` +
-    `<defs><radialGradient id="glow" cx="50%" cy="${((CY + 0.5) / rows) * 100}%" r="60%"><stop offset="0" stop-color="#ff6a1a" stop-opacity="0.55"/><stop offset="1" stop-color="#ff6a1a" stop-opacity="0"/></radialGradient></defs>` +
-    `<rect width="${W}" height="${rows}" fill="#080201"/>` +
-    `<rect width="${W}" height="${rows}" fill="url(#glow)"><animate attributeName="opacity" values="0.6;1;0.7;1;0.6" dur="2.2s" repeatCount="indefinite"/></rect>` +
-    flames +
-    paths(base(withTower, rows)) +
-    `<g>${pupils}<animateTransform attributeName="transform" type="translate" values="${gaze}" calcMode="discrete" dur="8s" repeatCount="indefinite"/></g>` +
-    `</svg>`
-  )
-}
 
 const hexRgb = (c: string | null) => (c ? parseInt(c.slice(1), 16) : 0x080201)
 
