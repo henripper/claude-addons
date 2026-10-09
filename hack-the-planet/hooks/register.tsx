@@ -20,6 +20,7 @@ import {
 import { EYE_MS, eyeLines, eyeTarget, isBrowserTool } from './eye'
 import { RABBIT_FRAME_MS, rabbitFrame } from './matrix'
 import { blank, globeCells, loadLevel, paintShip, shipLane } from './scenes'
+import { tickerSegments } from './ticker'
 import type { Load } from './scenes'
 
 const PANE = 'gibson'
@@ -256,15 +257,54 @@ export const register: Register = on => {
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     if (e.props.hasSurvey) return next(e)
-    const [list, current, eye] = await Promise.all([read($, daemons), read($, turn), read($, browsing)])
+    const [list, current, eye, open] = await Promise.all([read($, daemons), read($, turn), read($, browsing), read($, isPaneOpen)])
     const live = list.filter(one => one.status === 'running').length
     const load = levelOf(list, current)
     const isEye = isEyeOpen(eye)
-    if (live === 0 && load === 0 && !isEye) return next(e)
+    const now = Date.now()
+    // With The Gibson closed, the band also plays the rabbit's run.
+    const rabbit = !open ? [...list].reverse().find(one => one.status === 'granted' && now - one.endedAt < RABBIT_MS) : undefined
+    if (live === 0 && load === 0 && !isEye && !rabbit) return next(e)
 
-    const [n, open] = await Promise.all([read($, frame), read($, isPaneOpen)])
+    const n = await read($, frame)
+    const rabbitAt = rabbit ? await read($, hop) : 0
     const ui = $.ui.resolve(e)
     const { Box, Text, Button } = ui
+    const columns = Math.max(20, e.props.bodyColumns)
+    // The full-size art, when The Gibson is closed: the most striking one, at most 8 rows.
+    let big = null
+    if (!open) {
+      const art = (key: string, lines: string[], color: (y: number) => string) => (
+        <Box key={key} flexDirection="column">
+          {lines.map((line, y) => (
+            <Text key={`${key}-${y}`} color={color(y)} wrap="truncate-end">
+              {line || ' '}
+            </Text>
+          ))}
+        </Box>
+      )
+      if (isEye) {
+        const lines = eyeLines(n, columns).slice(1, 9)
+        big = art('band-eye', lines.map(l => l.text), y => lines[y]!.color)
+      } else if (rabbit) {
+        const lines = rabbitFrame(rabbitAt, columns)
+        if (lines.length) big = art('band-rabbit', lines, () => '#f4f8f6')
+      } else if (load >= 1) {
+        const globe = globeCells(load === 2 ? 5 : 7, n, live)
+        let laneLines: string[] = []
+        if (load === 2) {
+          const cells = blank(columns, 3)
+          paintShip(cells, n, 0)
+          laneLines = cellLines(cells.words, columns, 3)
+        }
+        big = (
+          <Box flexDirection="column">
+            {art('band-globe', cellLines(globe.words, globe.columns, globe.rows), () => GREEN)}
+            {laneLines.length > 0 && art('band-lane', laneLines, y => (y === 1 ? AMBER : y === 0 ? GREEN : DIM))}
+          </Box>
+        )
+      }
+    }
     // The band has one slot: keep what the other plugins (servers, usage-band) draw beneath us.
     const beneath = await next(e)
 
@@ -291,6 +331,37 @@ export const register: Register = on => {
             <Text color={HOT}>{eye.target}</Text>
           </Box>
         )}
+        {big}
+      </Box>
+    )
+  })
+
+  // The line under the chat box: the engine's hint, then a one-line ticker of mini animations.
+  on('ui.render', { component: 'PromptHint' }, async ($, e, next) => {
+    const [list, current, eye] = await Promise.all([read($, daemons), read($, turn), read($, browsing)])
+    const now = Date.now()
+    const live = list.filter(one => one.status === 'running').length
+    const load = levelOf(list, current)
+    const isEye = isEyeOpen(eye)
+    const rabbit = [...list].reverse().find(one => one.status === 'granted' && now - one.endedAt < RABBIT_MS)
+    if (live === 0 && load === 0 && !isEye && !rabbit) return next(e)
+    const n = await read($, frame)
+    const rabbitAt = rabbit ? await read($, hop) : null
+    const segments = tickerSegments({ frame: n, rabbit: rabbitAt, live, load, eye: isEye && eye ? eye.target : null })
+    if (segments.length === 0) return next(e)
+    const { Box, Text } = $.ui.resolve(e)
+    return (
+      <Box flexDirection="row" gap={2}>
+        {e.props.hint && (
+          <Text dimColor wrap="truncate-end">
+            {e.props.hint}
+          </Text>
+        )}
+        {segments.map((segment, k) => (
+          <Text key={`tick-${k}`} color={segment.color}>
+            {segment.text}
+          </Text>
+        ))}
       </Box>
     )
   })

@@ -30,6 +30,24 @@ Hackers (1995) + The Matrix + Tolkien, as a Claude Code add-on. Silly, but frigg
 
 Other plugins' rows (such as usage-band) keep showing; this one adds its row beneath theirs.
 
+### Under the chat box: the ticker
+
+One line after the usual hint (`esc to interrupt` and so on), always on, Gibson open or not. It shows mini versions of what's happening right now:
+
+| Mini | Triggered by |
+| --- | --- |
+| `( ◉ ) THE EYE IS UPON postimees.ee`, the pupil glancing around | Claude using the built-in browser |
+| `···~(\'>······`, the rabbit dashing across | A subagent finishes successfully |
+| `···░▒▓██▙▖····`, the freighter crossing | Heavy workload |
+| `◐ UPLINK ◆◆◆`, a spinning globe glyph, one `◆` per agent | Busy or heavy workload |
+| `ICE 3` | Subagents running |
+
+When nothing is going on, the line is left as Claude draws it.
+
+### Above the chat box when The Gibson is closed
+
+With the side panel closed, the band above the prompt also plays the full-size art, the most striking one at a time and at most 8 rows: the Eye of Sauron, then the rabbit, then the globe (with the freighter under heavy load).
+
 ### In The Gibson
 
 | Animation | Triggered by |

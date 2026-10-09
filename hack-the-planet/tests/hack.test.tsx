@@ -149,3 +149,40 @@ test('two daemons draw the globe in text on the desktop', async ($, on) => {
   expect(await ui.find({ type: 'Text', text: /[█▓]/ })).toBeDefined()
   await ui.unmount()
 })
+
+test('the ticker under the chat box plays the minis and keeps the hint', async ($, on) => {
+  const clock = mock.clock(on)
+  on('agent.list', () => ({ value: ['a1', 'a2', 'a3'].map(id => ({ ...AGENT, id })) }))
+  on('ui.open', () => ({ value: { isPlaced: true } }))
+  on('ui.toast', () => ({ value: undefined }))
+  await $.command.run(HACK)
+  await clock.advance(1100)
+
+  for (const surface of ['terminal', 'desktop'] as const) {
+    const ui = await $.ui.mount({ plugin: 'hack-the-planet', surface, component: 'PromptHint', props: { isDraft: false, isWorking: true, hint: 'esc to interrupt' } })
+    expect(await ui.find({ type: 'Text', text: /esc to interrupt/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /UPLINK/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /ICE 3/ })).toBeDefined()
+    await ui.unmount()
+  }
+})
+
+test('with The Gibson closed the band draws the full-size art', async ($, on) => {
+  const clock = mock.clock(on)
+  on('agent.list', () => ({ value: ['a1', 'a2'].map(id => ({ ...AGENT, id })) }))
+  on('ui.toast', () => ({ value: undefined }))
+  on('ui.render', { component: 'AbovePrompt' }, ($, e) => {
+    const { Text } = $.ui.resolve(e)
+    return <Text key="usage">Session 42%</Text>
+  })
+  on('ui.open', () => ({ value: { isPlaced: true } }))
+  on('ui.close', () => ({ value: undefined }))
+  await $.command.run(HACK)
+  await clock.advance(1100)
+  await $.command.run({ ...HACK, args: 'close' })
+
+  const ui = await $.ui.mount({ plugin: 'hack-the-planet', surface: 'desktop', component: 'AbovePrompt', props: BAND })
+  expect(await ui.find({ type: 'Text', text: /Session 42%/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /[█▓]/ })).toBeDefined()
+  await ui.unmount()
+})
