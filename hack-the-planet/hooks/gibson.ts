@@ -10,10 +10,10 @@ const GLYPHS = 'ｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅ�
 
 const WORDS: Record<string, string[]> = {
   thinking: ['DECRYPTING', 'CRACKING CIPHERS', 'THERE IS NO SPOON', 'BRUTE-FORCING', 'BENDING THE SPOON'],
-  requesting: ['DIALING IN', 'CALLING THE OPERATOR', 'REROUTING VIA BULGARIA', 'JACKING IN'],
+  requesting: ['DIALING IN', 'CALLING THE OPERATOR', 'REROUTING VIA {COUNTRY}', 'JACKING IN'],
   responding: ['UPLOADING PAYLOAD', 'TRANSMITTING', 'WRITING TO THE MAINFRAME'],
   'tool-input': ['INJECTING CODE', 'ARMING EXPLOIT'],
-  'tool-use': ['INFILTRATING', 'BYPASSING ICE', 'FOLLOWING THE WHITE RABBIT', 'HACKING THE GIBSON', 'DODGING BULLETS'],
+  'tool-use': ['INFILTRATING', 'BYPASSING ICE', 'REROUTING VIA {COUNTRY}', 'FOLLOWING THE WHITE RABBIT', 'HACKING THE GIBSON', 'DODGING BULLETS'],
 }
 
 /** A small deterministic hash, so a frame always draws the same cells. */
@@ -35,10 +35,21 @@ export function hex(seed: number): string {
   return '0x' + hash(seed, 7).toString(16).toUpperCase().padStart(8, '0')
 }
 
+// Where the trace gets bounced through: one is drawn at random each time the line comes up.
+const COUNTRIES = [
+  'BULGARIA', 'ESTONIA', 'ICELAND', 'MOLDOVA', 'MONGOLIA', 'BELARUS', 'NORTH KOREA', 'CHILE',
+  'KAZAKHSTAN', 'TUVALU', 'ANTARCTICA', 'GREENLAND', 'NIGERIA', 'PANAMA', 'LIECHTENSTEIN',
+  'MONACO', 'NAURU', 'SEYCHELLES', 'BHUTAN', 'LUXEMBOURG', 'URUGUAY', 'FIJI', 'MALTA', 'LATVIA',
+  'ROMANIA', 'SAN MARINO', 'VANUATU', 'THE CAYMAN ISLANDS', 'ANDORRA', 'TRANSNISTRIA',
+]
+
 /** The spinner's word: picked by what the turn is doing, a new one every ~3 seconds. */
 export function hackerWord(mode: string, frame: number): string {
   const list = WORDS[mode] ?? WORDS['tool-use']!
-  return list[Math.floor(frame / 15) % list.length]!
+  const slot = Math.floor(frame / 15)
+  const word = list[slot % list.length]!
+  // The country is fixed for the slot, so it holds while the line is on screen.
+  return word.replace('{COUNTRY}', COUNTRIES[hash(slot, 42) % COUNTRIES.length]!)
 }
 
 /** An indeterminate bar: a bright block sweeping back and forth. */

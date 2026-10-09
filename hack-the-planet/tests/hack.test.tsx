@@ -14,6 +14,10 @@ const PANE = { ...SITE, title: 'The Gibson', isFocused: false, placement: 'dock'
 test('drawing helpers stay in bounds', async () => {
   expect(sweep(5, 14).length).toBe(14)
   expect(hackerWord('thinking', 0)).toBe('DECRYPTING')
+  // Every reroute names a country, and not always the same one.
+  const reroutes = new Set(Array.from({ length: 400 }, (_, k) => hackerWord('requesting', k * 15)).filter(w => w.startsWith('REROUTING')))
+  expect([...reroutes].every(w => !w.includes('{'))).toBe(true)
+  expect(reroutes.size).toBeGreaterThan(5)
   expect(shortTool('Edit', { file_path: '/a/b/register.tsx' })).toBe('Edit register.tsx')
   expect(cellLines(Uint32Array.of(0x41, 0, 0, 0x42, 0, 0, 0x20, 0, 0), 3, 1)).toEqual(['AB'])
 })
