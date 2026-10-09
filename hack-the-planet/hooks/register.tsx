@@ -13,11 +13,14 @@ import {
   glyph,
   hackerWord,
   hex,
-  rainCells,
+  encodeCells,
   rainSvg,
+  rainWords,
   shortTool,
   sweep,
 } from './gibson'
+import { globeCells, globeSvg, loadLevel, paintShip, shipLane, shipSvg } from './scenes'
+import type { Load } from './scenes'
 
 const PANE = 'gibson'
 const TITLE = 'The Gibson'
@@ -39,6 +42,15 @@ const FAILED = new Set(['failed', 'killed'])
 
 let feedCount = 0
 let isPolling = false
+let lastLoad: Load = 0
+let lastCargoToast = 0
+
+function levelOf(list: readonly Daemon[], current: Turn): Load {
+  const live = list.filter(one => one.status === 'running').length
+  return loadLevel(live, current?.promptChars ?? 0, current?.toolCalls ?? 0)
+}
+
+const LOAD_LABEL = ['NOMINAL', 'BUSY', 'HEAVY TRAFFIC'] as const
 
 async function openPane($: EngineInterface): Promise<void> {
   await $.ui.open({ id: PANE, title: TITLE })
@@ -100,6 +112,12 @@ async function poll($: EngineInterface): Promise<void> {
 async function tick($: EngineInterface): Promise<void> {
   const [running, open, list] = await Promise.all([read($, turn), read($, isPaneOpen), read($, daemons)])
   if (running || open || list.length > 0) await update($, frame, n => n + 1)
+  const load = levelOf(list, running)
+  if (load === 2 && lastLoad < 2 && Date.now() - lastCargoToast > 60000) {
+    lastCargoToast = Date.now()
+    $.ui.toast('⚠ CARGO INBOUND: heavy workload detected. Global uplink engaged.')
+  }
+  lastLoad = load
 }
 
 export const register: Register = on => {
@@ -142,7 +160,7 @@ export const register: Register = on => {
   }).catch(($, e, next) => next(e))
 
   on('turn.start', async ($, e, next) => {
-    await update($, turn, () => ({ startedAt: Date.now() }))
+    await update($, turn, () => ({ startedAt: Date.now(), promptChars: e.text.length, toolCalls: 0 }))
     return next(e)
   })
 
@@ -160,6 +178,7 @@ export const register: Register = on => {
     feedCount += 1
     const entry = `${hex(feedCount)}  ${who.toUpperCase().slice(0, 10).padEnd(10)} ${line}`
     void update($, feed, lines => [...lines, entry].slice(-FEED_MAX))
+    void update($, turn, now => (now ? { ...now, toolCalls: now.toolCalls + 1 } : now))
     if (agentId) void update($, daemons, all => all.map(one => (one.id === agentId ? { ...one, tool: line } : one)))
     const result = await next(e)
     if (e.tool === 'Agent') void poll($)
@@ -175,6 +194,7 @@ export const register: Register = on => {
     const cursor = n % 4 < 2 ? '_' : ' '
     const since = current ? elapsed(Date.now() - current.startedAt) : '0s'
     const tail = live > 0 ? ` · ${live} daemon${live === 1 ? '' : 's'}` : ''
+    const load = levelOf(list, current)
 
     return (
       <Box flexDirection="row" gap={1}>
@@ -183,15 +203,22 @@ export const register: Register = on => {
         </Text>
         <Text color={GREEN}>{`[${sweep(n, 14)}]`}</Text>
         <Text color={DIM}>{`${hex(Math.floor(n / 2))} · ${since}${tail}`}</Text>
+        {load >= 1 && (
+          <Text color={AMBER} bold={n % 4 < 2}>
+            {`⚠ ${LOAD_LABEL[load]}`}
+          </Text>
+        )}
+        {load === 2 && <Text color={AMBER}>{shipLane(n, 12)}</Text>}
       </Box>
     )
   })
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     if (e.props.hasSurvey) return next(e)
-    const list = await read($, daemons)
+    const [list, current] = await Promise.all([read($, daemons), read($, turn)])
     const live = list.filter(one => one.status === 'running').length
-    if (live === 0) return next(e)
+    const load = levelOf(list, current)
+    if (live === 0 && load === 0) return next(e)
 
     const [n, open] = await Promise.all([read($, frame), read($, isPaneOpen)])
     const { Box, Text, Button } = $.ui.resolve(e)
@@ -208,6 +235,7 @@ export const register: Register = on => {
           <Text color={DIM}>
             {live === 1 ? 'daemon' : 'daemons'} breaching the mainframe
           </Text>
+          {load >= 1 && <Text color={AMBER} bold={n % 4 < 2}>{`⚠ ${LOAD_LABEL[load]}`}</Text>}
           {!open && <Button key="jack-in" plain dimColor label="Jack in" onPress={() => openPane($)} />}
         </Box>
       </Box>
@@ -223,22 +251,61 @@ export const register: Register = on => {
     const now = Date.now()
     const live = list.filter(one => one.status === 'running').length
 
-    const rain =
-      'Raster' in ui ? (
+    const load = levelOf(list, current)
+    const rainRows = Math.max(load === 2 ? 6 : 4, Math.min(10, Math.floor(rows / 4)))
+    const width = Math.min(columns * 8, 720)
+    const height = load >= 1 ? 240 : 180
+    const scene =
+      load >= 1
+        ? globeSvg(Math.max(width - 90, 330), 112, 62, live) + (load === 2 ? shipSvg(width, 168) : '')
+        : ''
+
+    let rain
+    if ('Raster' in ui) {
+      const words = rainWords(columns, rainRows, n)
+      if (load === 2) paintShip({ columns, rows: rainRows, words }, n, rainRows - 3)
+      const globe = load >= 1 ? globeCells(9, n, live) : null
+      rain = (
         <Box flexDirection="column">
           <Text color={GREEN} bold>
             {'░▒▓ THE GIBSON ▓▒░'}
             <Text color={DIM}> hack the planet</Text>
           </Text>
-          <ui.Raster key="rain" columns={columns} rows={Math.max(4, Math.min(10, Math.floor(rows / 4)))} cells={rainCells(columns, Math.max(4, Math.min(10, Math.floor(rows / 4))), n)} />
+          <ui.Raster key="rain" columns={columns} rows={rainRows} cells={encodeCells(words)} />
+          {globe && (
+            <Box flexDirection="row" gap={2}>
+              <ui.Raster key="globe" columns={globe.columns} rows={globe.rows} cells={encodeCells(globe.words)} />
+              <Box flexDirection="column">
+                <Text color={GREEN} bold>
+                  GLOBAL UPLINK
+                </Text>
+                <Text color={DIM}>{`${live} satellite${live === 1 ? '' : 's'} tracking`}</Text>
+                <Text color={AMBER} bold={n % 4 < 2}>
+                  {`⚠ ${LOAD_LABEL[load]}`}
+                </Text>
+                {load === 2 && <Text color={AMBER}>cargo freighter inbound</Text>}
+              </Box>
+            </Box>
+          )}
         </Box>
-      ) : 'Svg' in ui ? (
-        <ui.Svg source={rainSvg(Math.min(columns * 8, 720), 180)} alt="Green code rain behind the words The Gibson" width={Math.min(columns * 8, 720)} height={180} isInteractive />
-      ) : (
+      )
+    } else if ('Svg' in ui) {
+      rain = (
+        <ui.Svg
+          source={rainSvg(width, height, 1, scene, load >= 1)}
+          alt={load >= 1 ? 'Code rain, a spinning pixel globe with orbiting satellites' + (load === 2 ? ' and a cargo ship flying by' : '') : 'Green code rain behind the words The Gibson'}
+          width={width}
+          height={height}
+          isInteractive
+        />
+      )
+    } else {
+      rain = (
         <Text color={GREEN} bold>
           {'░▒▓ THE GIBSON ▓▒░'}
         </Text>
       )
+    }
 
     const cards = list.map((one, i) => {
       const age = (one.status === 'running' ? now : one.endedAt) - one.startedAt
@@ -276,7 +343,7 @@ export const register: Register = on => {
           {`ROOT // uplink ${n % 4 < 2 ? '●' : '○'}  `}
           <Text color={DIM}>
             {current ? `turn ${elapsed(now - current.startedAt)} · ` : 'idle · '}
-            {live} daemon{live === 1 ? '' : 's'} online
+            {live} daemon{live === 1 ? '' : 's'} online · load {LOAD_LABEL[load]}
           </Text>
         </Text>
         {cards.length > 0 ? (

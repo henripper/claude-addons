@@ -11,7 +11,7 @@ export type Daemon = {
   endedAt: number
 }
 
-export type Turn = { startedAt: number } | null
+export type Turn = { startedAt: number; promptChars: number; toolCalls: number } | null
 
 declare module 'claude-code' {
   interface PluginState {

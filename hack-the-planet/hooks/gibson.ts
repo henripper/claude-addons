@@ -82,6 +82,11 @@ function drop(x: number, seed: number): { speed: number; offset: number; length:
  * as little-endian u32 triplets, base64.
  */
 export function rainCells(columns: number, rows: number, frame: number, seed = 1): string {
+  return encodeCells(rainWords(columns, rows, frame, seed))
+}
+
+/** The rain as raw cell words, for a caller that paints more over it before encoding. */
+export function rainWords(columns: number, rows: number, frame: number, seed = 1): Uint32Array {
   const words = new Uint32Array(columns * rows * 3)
   const DEFAULT = 0x01000000
   for (let x = 0; x < columns; x++) {
@@ -102,7 +107,11 @@ export function rainCells(columns: number, rows: number, frame: number, seed = 1
       words[i + 2] = DEFAULT
     }
   }
-  return toBase64(new Uint8Array(words.buffer))
+  return words
+}
+
+export function encodeCells(words: Uint32Array): string {
+  return toBase64(new Uint8Array(words.buffer, words.byteOffset, words.byteLength))
 }
 
 const B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
@@ -129,7 +138,7 @@ function escapeXml(text: string): string {
  * The desktop's rain: one SVG that animates itself with SMIL, so it falls smoothly
  * without a redraw. Its source depends only on the size, so redraws keep it running.
  */
-export function rainSvg(width: number, height: number, seed = 1): string {
+export function rainSvg(width: number, height: number, seed = 1, scene = '', isTitleLeft = false): string {
   const step = 14
   const columns = Math.floor(width / step)
   const parts: string[] = []
@@ -152,15 +161,18 @@ export function rainSvg(width: number, height: number, seed = 1): string {
         `<animateTransform attributeName="transform" type="translate" from="0 ${-span}" to="0 ${height + step}" dur="${dur}s" begin="${begin}s" repeatCount="indefinite"/></g></g>`,
     )
   }
+  const tx = isTitleLeft ? 142 : width / 2
+  const ty = isTitleLeft ? 36 : height / 2
   const title =
-    `<g font-size="22" font-weight="bold" text-anchor="middle">` +
-    `<rect x="${width / 2 - 130}" y="${height / 2 - 26}" width="260" height="44" fill="#020a04" fill-opacity="0.82" stroke="${GREEN}" stroke-width="1"/>` +
-    `<text x="${width / 2}" y="${height / 2 + 4}" fill="${GREEN}">░▒▓ THE GIBSON ▓▒░` +
+    `<g font-family="ui-monospace, Menlo, monospace" font-size="22" font-weight="bold" text-anchor="middle">` +
+    `<rect x="${tx - 130}" y="${ty - 26}" width="260" height="44" fill="#020a04" fill-opacity="0.82" stroke="${GREEN}" stroke-width="1"/>` +
+    `<text x="${tx}" y="${ty + 4}" fill="${GREEN}">░▒▓ THE GIBSON ▓▒░` +
     `<animate attributeName="fill-opacity" values="1;1;0.3;1;1;1;0.6;1" dur="3.7s" repeatCount="indefinite"/></text>` +
-    `<text x="${width / 2}" y="${height / 2 + 14}" font-size="9" fill="${DIM}" letter-spacing="3">HACK THE PLANET</text></g>`
+    `<text x="${tx}" y="${ty + 14}" font-size="9" fill="${DIM}" letter-spacing="3">HACK THE PLANET</text></g>`
   return (
     `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">` +
     `<rect width="100%" height="100%" fill="#020a04"/>` +
-    `<g font-family="ui-monospace, Menlo, monospace" font-size="13">${parts.join('')}</g>${title}</svg>`
+    `<g font-family="ui-monospace, Menlo, monospace" font-size="13">${parts.join('')}</g>` +
+    `<g font-family="ui-monospace, Menlo, monospace">${scene}</g>${title}</svg>`
   )
 }
