@@ -1,9 +1,9 @@
 import { expect, mock, test } from 'claude-code/testing'
 
 import { flybySvg } from '../hooks/flyby'
-import { hackerWord, shortTool, sweep, titleSvg } from '../hooks/gibson'
+import { cellRuns, hackerWord, shortTool, sweep } from '../hooks/gibson'
 import { eyeCells, eyeSvg, eyeTarget } from '../hooks/eye'
-import { rabbitSvg, wakeUpSvg } from '../hooks/matrix'
+import { rabbitSvg } from '../hooks/matrix'
 import { globeCells, globePanelSvg, loadLevel, shipLane } from '../hooks/scenes'
 
 const AGENT = { id: 'a1', description: 'Find auth code', type: 'Explore', status: 'running' as const }
@@ -16,7 +16,8 @@ test('drawing helpers stay in bounds', async () => {
   expect(sweep(5, 14).length).toBe(14)
   expect(hackerWord('thinking', 0)).toBe('DECRYPTING')
   expect(shortTool('Edit', { file_path: '/a/b/register.tsx' })).toBe('Edit register.tsx')
-  expect(titleSvg(400)).toContain('THE GIBSON')
+  const runs = cellRuns(Uint32Array.of(0x41, 0xff0000, 0x01000000, 0x42, 0xff0000, 0x01000000), 2, 1)
+  expect(runs).toEqual([[{ text: 'AB', fg: '#ff0000', bg: undefined }]])
 })
 
 test('band chip shows running daemons and keeps the other bands', async ($, on) => {
@@ -99,7 +100,7 @@ test('load levels and scene sizes', async () => {
   expect(loadLevel(0, 2500, 0)).toBe(2)
   expect(loadLevel(0, 0, 30)).toBe(2)
   // Every Svg source must stay under the engine's 131072 characters at the widest pane.
-  for (const svg of [flybySvg(720, 330, 99), globePanelSvg(720, 200, 6), eyeSvg(5, true), eyeSvg(1, false), rabbitSvg(720, 'Explore', '14s'), wakeUpSvg(720)]) {
+  for (const svg of [flybySvg(720, 330, 99), globePanelSvg(720, 200, 6), eyeSvg(5, true), eyeSvg(1, false), rabbitSvg(720, 'Explore', '14s')]) {
     expect(svg.length).toBeLessThan(131072)
   }
   expect(flybySvg(320, 330, 1).length).toBeLessThan(131072)

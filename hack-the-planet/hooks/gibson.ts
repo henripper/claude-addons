@@ -91,52 +91,29 @@ function toBase64(bytes: Uint8Array): string {
   return out
 }
 
-/** A column of the rain: its speed and phase, fixed per column. */
-function drop(x: number, seed: number): { speed: number; offset: number; length: number } {
-  const h = hash(x, seed)
-  return { speed: 1 + (h % 3), offset: h % 97, length: 5 + ((h >>> 8) % 9) }
-}
+export type Run = { text: string; fg?: string; bg?: string }
 
-function escapeXml(text: string): string {
-  return text.replace(/[<>&'"]/g, ch => `&#${ch.charCodeAt(0)};`)
-}
+const DEFAULT_COLOR = 0x01000000
+const toHex = (c: number) => (c === DEFAULT_COLOR ? undefined : '#' + c.toString(16).padStart(6, '0'))
 
 /**
- * The desktop's rain: one SVG that animates itself with SMIL, so it falls smoothly
- * without a redraw. Its source depends only on the size, so redraws keep it running.
+ * A cell grid (`[codePoint, fg, bg]` triplets) as rows of colored runs, for surfaces that
+ * draw only Text: each run becomes one styled span. Crops to `maxColumns`, keeping the middle.
  */
-export function titleSvg(width: number, height = 180, seed = 1): string {
-  const step = 14
-  const columns = Math.floor(width / step)
-  const parts: string[] = []
-  for (let x = 0; x < columns; x++) {
-    const { speed, offset, length } = drop(x, seed)
-    const span = length * step
-    const dur = (6 / speed + (offset % 5) * 0.4).toFixed(1)
-    const begin = -((offset % 40) / 10).toFixed(1)
-    const glyphs: string[] = []
-    for (let k = 0; k < length; k++) {
-      const isHead = k === length - 1
-      const opacity = isHead ? 1 : ((k + 1) / length) * 0.85
-      const fill = isHead ? HOT : GREEN
-      glyphs.push(
-        `<text y="${k * step}" fill="${fill}" fill-opacity="${opacity.toFixed(2)}">${escapeXml(glyph(x, k, seed))}</text>`,
-      )
+export function cellRuns(words: Uint32Array, columns: number, rows: number, maxColumns = columns): Run[][] {
+  const width = Math.min(columns, maxColumns)
+  const left = Math.floor((columns - width) / 2)
+  return Array.from({ length: rows }, (_, y) => {
+    const runs: Run[] = []
+    for (let x = left; x < left + width; x++) {
+      const i = (y * columns + x) * 3
+      const ch = String.fromCodePoint(words[i]!)
+      const fg = toHex(words[i + 1]!)
+      const bg = toHex(words[i + 2]!)
+      const last = runs[runs.length - 1]
+      if (last && last.fg === fg && last.bg === bg) last.text += ch
+      else runs.push({ text: ch, fg, bg })
     }
-    parts.push(
-      `<g transform="translate(${x * step + 3} 0)"><g>${glyphs.join('')}` +
-        `<animateTransform attributeName="transform" type="translate" from="0 ${-span}" to="0 ${height + step}" dur="${dur}s" begin="${begin}s" repeatCount="indefinite"/></g></g>`,
-    )
-  }
-  const title =
-    `<g font-size="22" font-weight="bold" text-anchor="middle">` +
-    `<rect x="${width / 2 - 130}" y="${height / 2 - 26}" width="260" height="44" fill="#020a04" fill-opacity="0.82" stroke="${GREEN}" stroke-width="1"/>` +
-    `<text x="${width / 2}" y="${height / 2 + 4}" fill="${GREEN}">░▒▓ THE GIBSON ▓▒░` +
-    `<animate attributeName="fill-opacity" values="1;1;0.3;1;1;1;0.6;1" dur="3.7s" repeatCount="indefinite"/></text>` +
-    `<text x="${width / 2}" y="${height / 2 + 14}" font-size="9" fill="${DIM}" letter-spacing="3">HACK THE PLANET</text></g>`
-  return (
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">` +
-    `<rect width="100%" height="100%" fill="#020a04"/>` +
-    `<g font-family="ui-monospace, Menlo, monospace" font-size="13">${parts.join('')}</g>${title}</svg>`
-  )
+    return runs
+  })
 }

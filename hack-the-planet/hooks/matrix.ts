@@ -1,6 +1,5 @@
 // Matrix moments, as one-shot SMIL SVGs that play once when drawn: the white rabbit
-// diving down its hole when a daemon finishes, and the "Wake up, Neo" intro when The
-// Gibson opens.
+// diving down its hole when a daemon finishes.
 
 import { AMBER, DIM, GREEN, HOT } from './gibson'
 
@@ -67,21 +66,6 @@ export function rabbitSvg(w: number, type: string, elapsed: string): string {
     typed('rt1', 14, 22, 'Follow the white rabbit.', 0.3, `fill="${GREEN}"`) +
     typed('rt2', 14, 42, `${type.toUpperCase()} daemon went down the hole: ACCESS GRANTED (${elapsed})`, 2.1, `fill="${AMBER}" font-weight="bold"`, 7.2) +
     `</g></svg>`
-  )
-}
-
-/** "Wake up, Neo…": typed on a black screen, then the rabbit climbs out of its hole and bounds away. */
-export function wakeUpSvg(w: number): string {
-  const h = 150
-  const lines = ['Wake up, Neo…', 'The Matrix has you…', 'Follow the white rabbit.', 'Knock, knock, Neo.']
-  return (
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">` +
-    `<rect width="${w}" height="${h}" fill="#000"/>` +
-    `<g font-family="${MONO}" font-size="14">` +
-    lines.map((text, i) => typed(`wk${i}`, 18, 28 + i * 24, text, 0.3 + i * 1.5, `fill="${GREEN}"`, 8.4)).join('') +
-    `</g>` +
-    rabbitScene('wr', w, Math.min(w - 120, 470), 128, 'out', 6.2) +
-    `</svg>`
   )
 }
 

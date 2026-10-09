@@ -16,11 +16,11 @@ import {
   encodeCells,
   shortTool,
   sweep,
-  titleSvg,
+  cellRuns,
 } from './gibson'
 import { flybySvg } from './flyby'
 import { EYE_MS, eyeCells, eyeSvg, eyeTarget, isBrowserTool } from './eye'
-import { RABBIT_TEXT, rabbitSvg, wakeUpSvg } from './matrix'
+import { RABBIT_TEXT, rabbitSvg } from './matrix'
 import { blank, globeCells, globePanelSvg, loadLevel, paintShip, shipLane } from './scenes'
 import type { Load } from './scenes'
 
@@ -31,7 +31,6 @@ const POLL_MS = 1000
 const LINGER_MS = 8000
 const GLITCH_MS = 1600
 const RABBIT_MS = 5000
-const INTRO_MS = 9500
 const FEED_MAX = 40
 
 const daemons = atom({ plugin: 'hack-the-planet', key: 'daemons' } as const, [] as Daemon[])
@@ -39,8 +38,16 @@ const feed = atom({ plugin: 'hack-the-planet', key: 'feed' } as const, [] as str
 const frame = atom({ plugin: 'hack-the-planet', key: 'frame' } as const, 0)
 // The desktop pane redraws once a second, not every frame: its SVGs animate themselves.
 const second = atom({ plugin: 'hack-the-planet', key: 'second' } as const, 0)
-const openedAt = atom({ plugin: 'hack-the-planet', key: 'openedAt' } as const, 0)
 const browsing = atom({ plugin: 'hack-the-planet', key: 'browsing' } as const, null as Browsing)
+
+/** A cell grid cut to at most `max` columns, keeping the middle, for a Raster in a narrow pane. */
+function cropWords(cells: { columns: number; rows: number; words: Uint32Array }, max: number): Uint32Array {
+  if (cells.columns <= max) return cells.words
+  const left = Math.floor((cells.columns - max) / 2)
+  const out = new Uint32Array(max * cells.rows * 3)
+  for (let y = 0; y < cells.rows; y++) out.set(cells.words.subarray((y * cells.columns + left) * 3, (y * cells.columns + left + max) * 3), y * max * 3)
+  return out
+}
 
 const isEyeOpen = (eye: Browsing) => !!eye && Date.now() - eye.at < EYE_MS
 const EYE_WORDS = ['THE EYE IS WATCHING', 'ONE TAB TO RULE THEM ALL', 'SCRYING THE WEB', 'THE EYE SEES ALL']
@@ -65,10 +72,8 @@ const LOAD_LABEL = ['NOMINAL', 'BUSY', 'HEAVY TRAFFIC'] as const
 const EYE_ORANGE = '#ff7a1a'
 
 async function openPane($: EngineInterface): Promise<void> {
-  const wasOpen = await read($, isPaneOpen)
   await $.ui.open({ id: PANE, title: TITLE })
   await update($, isPaneOpen, () => true)
-  if (!wasOpen) await update($, openedAt, () => Date.now())
 }
 
 /** Brings the daemon list in line with the engine's agents; toasts each one that finishes. */
@@ -280,9 +285,9 @@ export const register: Register = on => {
         )}
         {isEye && eye && (
           <Box key="eye-row" flexDirection="row" gap={1} alignItems="center">
-            {e.surface !== 'terminal' && 'Svg' in ui && <ui.Svg source={eyeSvg(1, false)} alt="The Eye of Sauron" width={60} height={26} isInteractive />}
+            {e.surface !== 'terminal' && 'Svg' in ui && ui.Svg && <ui.Svg source={eyeSvg(1, false)} alt="The Eye of Sauron" width={60} height={26} isInteractive />}
             <Text color={EYE_ORANGE} bold>
-              {e.surface === 'terminal' ? (n % 6 < 3 ? '◉' : '◎') + ' ' : ''}THE EYE IS UPON
+              {(n % 6 < 3 ? '◉' : '◎') + ' '}THE EYE IS UPON
             </Text>
             <Text color={HOT}>{eye.target}</Text>
           </Box>
@@ -292,83 +297,89 @@ export const register: Register = on => {
   })
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
-    const isTerminal = e.surface === 'terminal'
-    // The terminal animates by redrawing; the desktop's SVGs animate themselves, so it redraws per second.
-    const n = isTerminal ? await read($, frame) : (await read($, second)) * 5
-    const [list, lines, current, opened, eye] = await Promise.all([read($, daemons), read($, feed), read($, turn), read($, openedAt), read($, browsing)])
-    const isEye = isEyeOpen(eye)
     const ui = $.ui.resolve(e)
     const { Box, Text, Button } = ui
+    // Only a surface whose table really carries Svg (truthy, not merely listed) gets the SVG
+    // scenes, which animate themselves; everywhere else the pixel art is drawn in cells.
+    const Svg = e.surface !== 'terminal' && 'Svg' in ui ? ui.Svg : undefined
+    const Raster = 'Raster' in ui ? ui.Raster : undefined
+    const [list, lines, current, eye] = await Promise.all([read($, daemons), read($, feed), read($, turn), read($, browsing)])
+    const isEye = isEyeOpen(eye)
+    // Redraw every frame only while cell pixel art is moving; otherwise once a second, so the pane stays calm.
+    const isMoving = !Svg && (isEye || levelOf(list, current) >= 1)
+    const n = isMoving ? await read($, frame) : (await read($, second)) * 5
     const columns = Math.max(20, e.props.bodyColumns)
     const rows = e.props.scroll.bodyRows || e.viewport?.rows || 30
     const now = Date.now()
     const live = list.filter(one => one.status === 'running').length
     const load = levelOf(list, current)
     const width = Math.min(columns * 8, 720)
-
     const rabbit = [...list].reverse().find(one => one.status === 'granted' && now - one.endedAt < RABBIT_MS)
-    const isIntro = opened > 0 && now - opened < INTRO_MS
 
-    let header
-    if (!isTerminal && 'Svg' in ui) {
+    /** Pixel art from a cell grid: one Raster where the surface has it, else rows of colored Text. */
+    const pixels = (key: string, cells: { columns: number; rows: number; words: Uint32Array }) =>
+      Raster ? (
+        <Raster key={key} columns={Math.min(cells.columns, columns)} rows={cells.rows} cells={encodeCells(cropWords(cells, columns))} />
+      ) : (
+        <Box key={key} flexDirection="column">
+          {cellRuns(cells.words, cells.columns, cells.rows, columns).map((runs, y) => (
+            <Text key={`${key}-${y}`} wrap="truncate-end">
+              {runs.map(run => (
+                <Text color={run.fg} backgroundColor={run.bg}>
+                  {run.text}
+                </Text>
+              ))}
+            </Text>
+          ))}
+        </Box>
+      )
+
+    const eyeLine = eye && (
+      <Text color={EYE_ORANGE} bold>
+        THE EYE IS UPON <Text color={HOT}>{eye.target}</Text>
+      </Text>
+    )
+
+    let scenes
+    if (Svg) {
       // Each Svg sits in a keyed Box, so a redraw keeps it mounted and its animation running.
-      header = (
+      scenes = (
         <Box flexDirection="column" gap={1}>
-          <Box key="title">
-            <ui.Svg source={titleSvg(width)} alt="Green code rain behind the words The Gibson" width={width} height={180} isInteractive />
-          </Box>
-          {isIntro && (
-            <Box key={`intro-${opened}`}>
-              <ui.Svg source={wakeUpSvg(width)} alt="Wake up, Neo. The Matrix has you. Follow the white rabbit. Knock, knock." width={width} height={150} isInteractive />
-            </Box>
-          )}
           {load === 2 && (
             <Box key="flyby">
-              <ui.Svg source={flybySvg(width, 330, live)} alt="Recon flyby of a cargo ship, ending on a scan of its bridge" width={width} height={330} isInteractive />
+              <Svg source={flybySvg(width, 330, live)} alt="Recon flyby of a cargo ship, ending on a scan of its bridge" width={width} height={330} isInteractive />
             </Box>
           )}
           {load === 1 && (
             <Box key="globe">
-              <ui.Svg source={globePanelSvg(width, 200, live)} alt={`A spinning globe with ${live} satellites`} width={width} height={200} isInteractive />
+              <Svg source={globePanelSvg(width, 200, live)} alt={`A spinning globe with ${live} satellites`} width={width} height={200} isInteractive />
             </Box>
           )}
           {isEye && eye && (
             <Box key="eye" flexDirection="column" alignItems="center">
-              <ui.Svg source={eyeSvg(5, true)} alt="The Eye of Sauron atop Barad-dûr" width={300} height={220} isInteractive />
-              <Text color={EYE_ORANGE} bold>
-                THE EYE IS UPON <Text color={HOT}>{eye.target}</Text>
-              </Text>
+              <Svg source={eyeSvg(5, true)} alt="The Eye of Sauron atop Barad-dûr" width={300} height={220} isInteractive />
+              {eyeLine}
             </Box>
           )}
           {rabbit && (
             <Box key={`rabbit-${rabbit.id}`}>
-              <ui.Svg source={rabbitSvg(width, rabbit.type, elapsed(rabbit.endedAt - rabbit.startedAt))} alt={`The white rabbit dives down its hole: ${rabbit.type} finished`} width={width} height={104} isInteractive />
+              <Svg source={rabbitSvg(width, rabbit.type, elapsed(rabbit.endedAt - rabbit.startedAt))} alt={`The white rabbit dives down its hole: ${rabbit.type} finished`} width={width} height={104} isInteractive />
             </Box>
           )}
         </Box>
       )
     } else {
-      const globe = isTerminal && load >= 1 ? globeCells(9, n, live) : null
       let lane = null
-      if (isTerminal && load === 2 && 'Raster' in ui) {
+      if (load === 2) {
         const cells = blank(columns, 3)
         paintShip(cells, n, 0)
-        lane = <ui.Raster key="lane" columns={columns} rows={3} cells={encodeCells(cells.words)} />
+        lane = pixels('lane', cells)
       }
-      header = (
-        <Box flexDirection="column">
-          <Text color={GREEN} bold>
-            {'░▒▓ THE GIBSON ▓▒░'}
-            <Text color={DIM}> hack the planet</Text>
-          </Text>
-          {isIntro && (
-            <Text color={GREEN}>
-              {['Wake up, Neo…', 'The Matrix has you…', 'Follow the white rabbit.', 'Knock, knock, Neo.'][Math.min(3, Math.floor((now - opened) / 1500))]}
-            </Text>
-          )}
-          {globe && 'Raster' in ui && (
+      scenes = (
+        <Box flexDirection="column" gap={1}>
+          {load >= 1 && (
             <Box flexDirection="row" gap={2}>
-              <ui.Raster key="globe" columns={globe.columns} rows={globe.rows} cells={encodeCells(globe.words)} />
+              {pixels('globe', globeCells(9, n, live))}
               <Box flexDirection="column">
                 <Text color={GREEN} bold>
                   GLOBAL UPLINK
@@ -377,26 +388,40 @@ export const register: Register = on => {
                 <Text color={AMBER} bold={n % 4 < 2}>
                   {`⚠ ${LOAD_LABEL[load]}`}
                 </Text>
-                {load === 2 && <Text color={AMBER}>recon drone on the cargo ship</Text>}
+                {load === 2 && <Text color={AMBER}>cargo freighter inbound</Text>}
               </Box>
             </Box>
           )}
           {lane}
-          {isEye && eye && 'Raster' in ui && (() => {
-            const pix = eyeCells(n, true)
-            return (
-              <Box flexDirection="column">
-                <ui.Raster key="eye" columns={pix.columns} rows={pix.rows} cells={encodeCells(pix.words)} />
-                <Text color={EYE_ORANGE} bold>
-                  THE EYE IS UPON <Text color={HOT}>{eye.target}</Text>
+          {isEye && eye && (
+            <Box flexDirection="column">
+              {pixels('eye', eyeCells(n, true))}
+              {eyeLine}
+            </Box>
+          )}
+          {rabbit && (
+            <Box flexDirection="column">
+              {RABBIT_TEXT.map((line, k) => (
+                <Text key={`r-${k}`} color={HOT}>
+                  {line}
                 </Text>
-              </Box>
-            )
-          })()}
-          {rabbit && RABBIT_TEXT.map((line, k) => <Text key={`r-${k}`} color={HOT}>{line}</Text>)}
+              ))}
+            </Box>
+          )}
         </Box>
       )
     }
+
+    // The first iteration's header: plain text, no animation.
+    const header = (
+      <Box flexDirection="column" gap={1}>
+        <Text color={GREEN} bold>
+          {'░▒▓ THE GIBSON ▓▒░'}
+          <Text color={DIM}> hack the planet</Text>
+        </Text>
+        {scenes}
+      </Box>
+    )
 
     const cards = list.map((one, i) => {
       const age = (one.status === 'running' ? now : one.endedAt) - one.startedAt
