@@ -5,7 +5,7 @@ My Claude Code mods (plugins built from function hooks), kept in one place so ev
 | Add-on | What it does |
 | --- | --- |
 | [usage-band](usage-band) | Shows plan usage (5-hour session and weekly limits) and when each resets, in a row above the prompt |
-| [hack-the-planet](hack-the-planet) | Hackers (1995) + Matrix + Tolkien mode, all in colored text: green hacker spinner, `/hack` opens The Gibson pane (a card per running agent, an ASCII white rabbit hopping off when one finishes), an `ICE` chip above the prompt while agents run, a pixel Eye of Sauron whenever Claude browses in the built-in browser, a spinning globe under load and a cargo freighter crossing under heavy load. `/hack spinner off` restores the stock spinner |
+| [hack-the-planet](hack-the-planet) | Hackers (1995) + Matrix + Tolkien mode, all in colored text: green hacker spinner, `/hack` opens The Gibson side panel (a card per running agent, a white rabbit galloping off when one finishes, a spinning globe under load, a cargo freighter under heavy load, the Eye of Sauron while Claude browses), and an `ICE` chip above the prompt while agents run. See [its README](hack-the-planet/README.md) for every animation and what triggers it |
 
 ## Install on a new machine
 
