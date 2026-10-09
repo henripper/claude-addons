@@ -1,1 +1,1 @@
-{ "name": "hack-the-planet", "version": "0.5.0", "author": { "name": "henrip" }, "description": "Hackers-style green code rain: a hacker spinner, a /hack pane showing agents as daemons breaking into The Gibson, and a band chip while they run", "types": "./types/index.d.ts" }
+{ "name": "hack-the-planet", "version": "0.5.1", "author": { "name": "henrip" }, "description": "Hackers-style green code rain: a hacker spinner, a /hack pane showing agents as daemons breaking into The Gibson, and a band chip while they run", "types": "./types/index.d.ts" }

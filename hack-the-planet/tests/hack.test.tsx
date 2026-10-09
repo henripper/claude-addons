@@ -129,3 +129,18 @@ test('three daemons bring the globe and the cargo ship on both surfaces', async 
     await band.unmount()
   }
 })
+
+test('two daemons draw the globe in text on the desktop', async ($, on) => {
+  const clock = mock.clock(on)
+  on('agent.list', () => ({ value: ['a1', 'a2'].map(id => ({ ...AGENT, id })) }))
+  on('ui.open', () => ({ value: { isPlaced: true } }))
+  on('ui.toast', () => ({ value: undefined }))
+  await $.command.run(HACK)
+  await clock.advance(1100)
+
+  const ui = await $.ui.mount({ plugin: 'hack-the-planet', surface: 'desktop', component: 'Pane', requestId: 'gibson', props: PANE })
+  expect(await ui.find({ type: 'Text', text: /GLOBAL UPLINK/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /[█▓·]/ })).toBeDefined()
+  expect(await ui.find({ type: 'Raster' })).toBeUndefined()
+  await ui.unmount()
+})

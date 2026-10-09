@@ -299,7 +299,8 @@ export const register: Register = on => {
     const { Box, Text, Button } = ui
     // Everything here is drawn in cells and text: the desktop rebuilds an Svg on each redraw,
     // which flickers and restarts its animation, while colored characters redraw cleanly.
-    const Raster = 'Raster' in ui ? ui.Raster : undefined
+    // A Raster only on the terminal: other surfaces may list it without drawing it.
+    const Raster = e.surface === 'terminal' && 'Raster' in ui ? ui.Raster : undefined
     const [list, lines, current, eye] = await Promise.all([read($, daemons), read($, feed), read($, turn), read($, browsing)])
     const isEye = isEyeOpen(eye)
     // Redraw every frame only while cell pixel art is moving; otherwise once a second, so the pane stays calm.
