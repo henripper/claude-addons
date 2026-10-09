@@ -13,12 +13,11 @@ import {
   glyph,
   hackerWord,
   hex,
-  encodeCells,
   shortTool,
   sweep,
-  cellRuns,
+  cellLines,
 } from './gibson'
-import { EYE_MS, eyeCells, eyeTarget, isBrowserTool } from './eye'
+import { EYE_MS, eyeLines, eyeTarget, isBrowserTool } from './eye'
 import { rabbitFrame } from './matrix'
 import { blank, globeCells, loadLevel, paintShip, shipLane } from './scenes'
 import type { Load } from './scenes'
@@ -38,15 +37,6 @@ const frame = atom({ plugin: 'hack-the-planet', key: 'frame' } as const, 0)
 // The desktop pane redraws once a second, not every frame: its SVGs animate themselves.
 const second = atom({ plugin: 'hack-the-planet', key: 'second' } as const, 0)
 const browsing = atom({ plugin: 'hack-the-planet', key: 'browsing' } as const, null as Browsing)
-
-/** A cell grid cut to at most `max` columns, keeping the middle, for a Raster in a narrow pane. */
-function cropWords(cells: { columns: number; rows: number; words: Uint32Array }, max: number): Uint32Array {
-  if (cells.columns <= max) return cells.words
-  const left = Math.floor((cells.columns - max) / 2)
-  const out = new Uint32Array(max * cells.rows * 3)
-  for (let y = 0; y < cells.rows; y++) out.set(cells.words.subarray((y * cells.columns + left) * 3, (y * cells.columns + left + max) * 3), y * max * 3)
-  return out
-}
 
 const isEyeOpen = (eye: Browsing) => !!eye && Date.now() - eye.at < EYE_MS
 const EYE_WORDS = ['THE EYE IS WATCHING', 'ONE TAB TO RULE THEM ALL', 'SCRYING THE WEB', 'THE EYE SEES ALL']
@@ -299,8 +289,6 @@ export const register: Register = on => {
     const { Box, Text, Button } = ui
     // Everything here is drawn in cells and text: the desktop rebuilds an Svg on each redraw,
     // which flickers and restarts its animation, while colored characters redraw cleanly.
-    // A Raster only on the terminal: other surfaces may list it without drawing it.
-    const Raster = e.surface === 'terminal' && 'Raster' in ui ? ui.Raster : undefined
     const [list, lines, current, eye] = await Promise.all([read($, daemons), read($, feed), read($, turn), read($, browsing)])
     const isEye = isEyeOpen(eye)
     // Redraw every frame only while cell pixel art is moving; otherwise once a second, so the pane stays calm.
@@ -313,23 +301,16 @@ export const register: Register = on => {
     const live = list.filter(one => one.status === 'running').length
     const load = levelOf(list, current)
 
-    /** Pixel art from a cell grid: one Raster where the surface has it, else rows of colored Text. */
-    const pixels = (key: string, cells: { columns: number; rows: number; words: Uint32Array }) =>
-      Raster ? (
-        <Raster key={key} columns={Math.min(cells.columns, columns)} rows={cells.rows} cells={encodeCells(cropWords(cells, columns))} />
-      ) : (
-        <Box key={key} flexDirection="column">
-          {cellRuns(cells.words, cells.columns, cells.rows, columns).map((runs, y) => (
-            <Text key={`${key}-${y}`} wrap="truncate-end">
-              {runs.map(run => (
-                <Text color={run.fg} backgroundColor={run.bg}>
-                  {run.text}
-                </Text>
-              ))}
-            </Text>
-          ))}
-        </Box>
-      )
+    /** Character art drawn like the loading bars: one plain Text per line, one color each. */
+    const art = (key: string, lines: string[], color: (y: number) => string) => (
+      <Box key={key} flexDirection="column">
+        {lines.map((line, y) => (
+          <Text key={`${key}-${y}`} color={color(y)} wrap="truncate-end">
+            {line || ' '}
+          </Text>
+        ))}
+      </Box>
+    )
 
     const eyeLine = eye && (
       <Text color={EYE_ORANGE} bold>
@@ -343,13 +324,16 @@ export const register: Register = on => {
       if (load === 2) {
         const cells = blank(columns, 3)
         paintShip(cells, n, 0)
-        lane = pixels('lane', cells)
+        lane = art('lane', cellLines(cells.words, columns, 3), y => (y === 1 ? AMBER : y === 0 ? GREEN : DIM))
       }
       scenes = (
         <Box flexDirection="column" gap={1}>
           {load >= 1 && (
             <Box flexDirection="row" gap={2}>
-              {pixels('globe', globeCells(9, n, live))}
+              {(() => {
+                const globe = globeCells(9, n, live)
+                return art('globe', cellLines(globe.words, globe.columns, globe.rows), () => GREEN)
+              })()}
               <Box flexDirection="column">
                 <Text color={GREEN} bold>
                   GLOBAL UPLINK
@@ -365,7 +349,10 @@ export const register: Register = on => {
           {lane}
           {isEye && eye && (
             <Box flexDirection="column">
-              {pixels('eye', eyeCells(n, true))}
+              {(() => {
+                const lines = eyeLines(n, columns)
+                return art('eye', lines.map(l => l.text), y => lines[y]!.color)
+              })()}
               {eyeLine}
             </Box>
           )}

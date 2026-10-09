@@ -71,49 +71,13 @@ export function shortTool(tool: string, input: Record<string, unknown>): string 
   return one ? `${tool} ${one.length > 40 ? one.slice(0, 39) + '…' : one}` : tool
 }
 
-export function encodeCells(words: Uint32Array): string {
-  return toBase64(new Uint8Array(words.buffer, words.byteOffset, words.byteLength))
-}
-
-const B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
-
-function toBase64(bytes: Uint8Array): string {
-  let out = ''
-  for (let i = 0; i < bytes.length; i += 3) {
-    const a = bytes[i]!
-    const b = bytes[i + 1]
-    const c = bytes[i + 2]
-    const n = (a << 16) | ((b ?? 0) << 8) | (c ?? 0)
-    out += B64[(n >> 18) & 63]! + B64[(n >> 12) & 63]!
-    out += b === undefined ? '=' : B64[(n >> 6) & 63]!
-    out += c === undefined ? '=' : B64[n & 63]!
-  }
-  return out
-}
-
-export type Run = { text: string; fg?: string; bg?: string }
-
-const DEFAULT_COLOR = 0x01000000
-const toHex = (c: number) => (c === DEFAULT_COLOR ? undefined : '#' + c.toString(16).padStart(6, '0'))
-
-/**
- * A cell grid (`[codePoint, fg, bg]` triplets) as rows of colored runs, for surfaces that
- * draw only Text: each run becomes one styled span. Crops to `maxColumns`, keeping the middle.
- */
-export function cellRuns(words: Uint32Array, columns: number, rows: number, maxColumns = columns): Run[][] {
+/** A cell grid's characters as plain lines, cropped to `maxColumns` keeping the middle. */
+export function cellLines(words: Uint32Array, columns: number, rows: number, maxColumns = columns): string[] {
   const width = Math.min(columns, maxColumns)
   const left = Math.floor((columns - width) / 2)
   return Array.from({ length: rows }, (_, y) => {
-    const runs: Run[] = []
-    for (let x = left; x < left + width; x++) {
-      const i = (y * columns + x) * 3
-      const ch = String.fromCodePoint(words[i]!)
-      const fg = toHex(words[i + 1]!)
-      const bg = toHex(words[i + 2]!)
-      const last = runs[runs.length - 1]
-      if (last && last.fg === fg && last.bg === bg) last.text += ch
-      else runs.push({ text: ch, fg, bg })
-    }
-    return runs
+    let line = ''
+    for (let x = left; x < left + width; x++) line += String.fromCodePoint(words[(y * columns + x) * 3]!)
+    return line.trimEnd()
   })
 }

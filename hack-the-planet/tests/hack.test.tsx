@@ -1,7 +1,7 @@
 import { expect, mock, test } from 'claude-code/testing'
 
-import { cellRuns, hackerWord, shortTool, sweep } from '../hooks/gibson'
-import { eyeCells, eyeTarget } from '../hooks/eye'
+import { cellLines, hackerWord, shortTool, sweep } from '../hooks/gibson'
+import { eyeLines, eyeTarget } from '../hooks/eye'
 import { rabbitFrame } from '../hooks/matrix'
 import { globeCells, loadLevel, shipLane } from '../hooks/scenes'
 
@@ -15,8 +15,7 @@ test('drawing helpers stay in bounds', async () => {
   expect(sweep(5, 14).length).toBe(14)
   expect(hackerWord('thinking', 0)).toBe('DECRYPTING')
   expect(shortTool('Edit', { file_path: '/a/b/register.tsx' })).toBe('Edit register.tsx')
-  const runs = cellRuns(Uint32Array.of(0x41, 0xff0000, 0x01000000, 0x42, 0xff0000, 0x01000000), 2, 1)
-  expect(runs).toEqual([[{ text: 'AB', fg: '#ff0000', bg: undefined }]])
+  expect(cellLines(Uint32Array.of(0x41, 0, 0, 0x42, 0, 0, 0x20, 0, 0), 3, 1)).toEqual(['AB'])
 })
 
 test('band chip shows running daemons and keeps the other bands', async ($, on) => {
@@ -104,8 +103,10 @@ test('load levels and scene sizes', async () => {
   expect(globe.words.length).toBe(globe.columns * globe.rows * 3)
   expect(shipLane(4, 12).length).toBe(12)
   expect(eyeTarget('mcp__Claude_Browser__navigate', { url: 'https://a.b.com/x?y' })).toBe('a.b.com')
-  const eye = eyeCells(7, true)
-  expect(eye.words.length).toBe(eye.columns * eye.rows * 3)
+  const eye = eyeLines(7, 44)
+  expect(eye.length).toBe(15)
+  expect(eye.every(line => line.text.length <= 44)).toBe(true)
+  expect(eye.some(line => line.text.includes('@'))).toBe(true)
 })
 
 test('three daemons bring the globe and the cargo ship on both surfaces', async ($, on) => {
@@ -140,7 +141,6 @@ test('two daemons draw the globe in text on the desktop', async ($, on) => {
 
   const ui = await $.ui.mount({ plugin: 'hack-the-planet', surface: 'desktop', component: 'Pane', requestId: 'gibson', props: PANE })
   expect(await ui.find({ type: 'Text', text: /GLOBAL UPLINK/ })).toBeDefined()
-  expect(await ui.find({ type: 'Text', text: /[█▓·]/ })).toBeDefined()
-  expect(await ui.find({ type: 'Raster' })).toBeUndefined()
+  expect(await ui.find({ type: 'Text', text: /[█▓]/ })).toBeDefined()
   await ui.unmount()
 })

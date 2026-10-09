@@ -1,6 +1,6 @@
 // The Eye of Sauron, in pixels, for while Claude browses the web: a fiery almond eye
 // with a slit pupil that looks around, flames flickering in four frames, and the horns
-// of Barad-dûr, drawn as half-block cells.
+// of Barad-dûr, drawn as plain text lines.
 
 import { hash } from './gibson'
 
@@ -105,31 +105,48 @@ function pupil(shift: number, wide: boolean): [number, number][] {
 // Where the pupil looks over its 8-second cycle, and when it dilates.
 const GAZE = [0, 0, -5, -5, -5, 4, 4, 0, 0, 2, -2, 0]
 
-const hexRgb = (c: string | null) => (c ? parseInt(c.slice(1), 16) : 0x080201)
+// Brightness as characters, brightest first: the iris's white-hot core out to its rim,
+// then the flames, the tower and the horns. The pupil is left blank so it reads as a slit.
+const CHAR: Record<string, string> = {
+  '#fff6b0': '@', '#ffd23a': '#', '#ff9a1f': '*', '#e4501c': '+', '#a81e0a': '=',
+  '#ff6a1a': '^', '#d2340d': "'", '#6e1006': '.',
+  '#e0681e': '^', '#ff8a2a': '^', '#c0561c': '/', '#74301a': '|', '#5a2410': ':', '#2e1108': '.',
+  '#120200': ' ',
+}
+const RANK = Object.keys(CHAR)
+
+export type Line = { text: string; color: string }
 
 /**
- * The terminal's eye: two grid rows per cell as an upper half block, the top pixel its
- * foreground and the bottom its background, so pixels stay square. Animated by `frame`.
+ * The eye as plain text lines, one color per line like the loading bars: two grid rows
+ * per line (characters are twice as tall as wide), cropped to `maxColumns`. Animated by
+ * `frame`: the flames flicker and the pupil looks around.
  */
-export function eyeCells(frame: number, withTower: boolean): { columns: number; rows: number; words: Uint32Array } {
-  const rows = withTower ? H : 26
-  const grid = base(withTower, rows)
+export function eyeLines(frame: number, maxColumns: number): Line[] {
+  const grid = base(true, H)
   const f = Math.floor(frame / 2) % FLAME_FRAMES
-  for (let y = 0; y < rows; y++) for (let x = 0; x < W; x++) grid[y]![x] ??= flame(x, y, f)
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) grid[y]![x] ??= flame(x, y, f)
   const step = Math.floor(frame / 5) % GAZE.length
   const wide = step >= 7 && step <= 9
   for (const [x, y] of pupil(GAZE[step]!, wide)) if (grid[y]) grid[y]![x] = '#120200'
-  const cellRows = Math.ceil(rows / 2)
-  const words = new Uint32Array(W * cellRows * 3)
-  for (let r = 0; r < cellRows; r++) {
-    for (let x = 0; x < W; x++) {
-      const i = (r * W + x) * 3
-      words[i] = 0x2580
-      words[i + 1] = hexRgb(grid[r * 2]![x] ?? null)
-      words[i + 2] = hexRgb(grid[r * 2 + 1]?.[x] ?? null)
+  const width = Math.min(W, maxColumns)
+  const left = Math.floor((W - width) / 2)
+  const lines: Line[] = []
+  // The eye, the horns and the top of the tower: the rest of the tower would only add height.
+  for (let r = 0; r < 15; r++) {
+    let text = ''
+    for (let x = left; x < left + width; x++) {
+      const a = grid[r * 2]![x] ?? null
+      const b = grid[r * 2 + 1]![x] ?? null
+      // The pupil wins so the slit stays whole; otherwise the brighter of the two pixels.
+      const pick = a === '#120200' || b === '#120200' ? '#120200' : a && b ? (RANK.indexOf(a) <= RANK.indexOf(b) ? a : b) : a ?? b
+      text += pick ? CHAR[pick] ?? '.' : ' '
     }
+    const y = r * 2
+    const color = y >= CY + 10 ? '#8a3a15' : Math.abs(y - CY) <= 3 ? '#ffc23a' : Math.abs(y - CY) <= 7 ? '#ff7a1a' : '#d2340d'
+    lines.push({ text: text.trimEnd(), color })
   }
-  return { columns: W, rows: cellRows, words }
+  return lines
 }
 
 /** What the browser tool is looking at, short: a host for a URL, else the action. */
