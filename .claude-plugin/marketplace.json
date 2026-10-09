@@ -1,11 +1,18 @@
 {
   "name": "claude-addons",
-  "owner": { "name": "henripper" },
+  "owner": {
+    "name": "henripper"
+  },
   "plugins": [
     {
       "name": "usage-band",
       "source": "./usage-band",
       "description": "Shows plan usage (session and weekly limits) and when each resets, above the prompt"
+    },
+    {
+      "name": "hack-the-planet",
+      "source": "./hack-the-planet",
+      "description": "Hackers-style green code rain: hacker spinner, a /hack pane of agents breaking into The Gibson, and a band chip while they run"
     }
   ]
 }

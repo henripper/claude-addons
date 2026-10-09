@@ -5,6 +5,7 @@ My Claude Code mods (plugins built from function hooks), kept in one place so ev
 | Add-on | What it does |
 | --- | --- |
 | [usage-band](usage-band) | Shows plan usage (5-hour session and weekly limits) and when each resets, in a row above the prompt |
+| [hack-the-planet](hack-the-planet) | Hackers (1995) mode: green hacker spinner every turn, `/hack` opens The Gibson pane (code rain plus a card per running agent), and an `ICE` chip above the prompt while agents run. `/hack spinner off` restores the stock spinner |
 
 ## Install on a new machine
 
