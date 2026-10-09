@@ -1,7 +1,7 @@
 import { expect, mock, test } from 'claude-code/testing'
 
 import { cellLines, hackerWord, shortTool, sweep } from '../hooks/gibson'
-import { eyeLines, eyeTarget } from '../hooks/eye'
+import { eyeLines, eyeTarget, lookedAt } from '../hooks/eye'
 import { rabbitFrame } from '../hooks/matrix'
 import { globeCells, loadLevel, shipLane } from '../hooks/scenes'
 
@@ -185,4 +185,20 @@ test('with The Gibson closed the band draws the full-size art', async ($, on) =>
   expect(await ui.find({ type: 'Text', text: /Session 42%/ })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: /[█▓]/ })).toBeDefined()
   await ui.unmount()
+})
+
+test('looking at an image or upload summons the Eye too', async ($, on) => {
+  expect(lookedAt({ command: "python palette.py /tmp/images/2.jpg" })).toBe('2.jpg')
+  expect(lookedAt({ text: 'look at this [Image #1]' })).toBe('your upload')
+  expect(lookedAt({ command: 'ls -la' })).toBe(null)
+  const clock = mock.clock(on)
+  on('ui.open', () => ({ value: { isPlaced: true } }))
+  on('tool.call', () => ({ result: 'ok' }) as never)
+  on('ui.log', () => ({ value: undefined }))
+  await $.command.run(HACK)
+  await $.tool.call({ tool: 'Read', file_path: '/Users/me/Desktop/plot.png' } as never)
+  await clock.advance(300)
+  const pane = await $.ui.mount({ plugin: 'hack-the-planet', surface: 'desktop', component: 'Pane', requestId: 'gibson', props: PANE })
+  expect(await pane.find({ type: 'Text', text: /plot\.png/ })).toBeDefined()
+  await pane.unmount()
 })

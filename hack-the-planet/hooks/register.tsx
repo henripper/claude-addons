@@ -17,7 +17,7 @@ import {
   sweep,
   cellLines,
 } from './gibson'
-import { EYE_MS, eyeLines, eyeTarget, isBrowserTool } from './eye'
+import { EYE_MS, eyeLines, eyeTarget, isBrowserTool, lookedAt } from './eye'
 import { RABBIT_FRAME_MS, rabbitFrame } from './matrix'
 import { blank, globeCells, loadLevel, paintShip, shipLane } from './scenes'
 import { tickerSegments } from './ticker'
@@ -198,6 +198,9 @@ export const register: Register = on => {
 
   on('turn.start', async ($, e, next) => {
     await update($, turn, () => ({ startedAt: Date.now(), promptChars: e.text.length, toolCalls: 0 }))
+    // An uploaded image or file in the prompt: the Eye turns to it.
+    const file = lookedAt({ text: e.text })
+    if (file) await update($, browsing, () => ({ at: Date.now(), target: file }))
     return next(e)
   })
 
@@ -220,6 +223,10 @@ export const register: Register = on => {
     if (isBrowserTool(e.tool)) {
       const target = eyeTarget(e.tool, e as unknown as Record<string, unknown>)
       void update($, browsing, eye => ({ at: Date.now(), target: target.includes('.') || !eye ? target : eye.target }))
+    } else {
+      // Any tool opening an image, PDF or video: the Eye is upon that file.
+      const file = lookedAt(e as unknown as Record<string, unknown>)
+      if (file) void update($, browsing, () => ({ at: Date.now(), target: file }))
     }
     const result = await next(e)
     if (e.tool === 'Agent') void poll($)

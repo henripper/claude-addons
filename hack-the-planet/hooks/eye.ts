@@ -159,6 +159,22 @@ export function eyeTarget(tool: string, input: Record<string, unknown>): string 
   return tool.replace(/^.*Claude_Browser__/, '').replace(/_/g, ' ')
 }
 
+const LOOKABLE = /([\w.-]+\.(?:png|jpe?g|gif|webp|heic|bmp|tiff?|svg|pdf|mov|mp4))\b/i
+
+/**
+ * The image, PDF or video an input looks at, by file name: a tool's arguments or a prompt
+ * with an upload in it. Null when there is nothing to look at.
+ */
+export function lookedAt(input: Record<string, unknown>): string | null {
+  for (const value of Object.values(input)) {
+    if (typeof value !== 'string') continue
+    const hit = LOOKABLE.exec(value)
+    if (hit) return hit[1]!
+    if (/\[Image\b/.test(value)) return 'your upload'
+  }
+  return null
+}
+
 export function isBrowserTool(tool: string): boolean {
   return tool.includes('Claude_Browser__')
 }
