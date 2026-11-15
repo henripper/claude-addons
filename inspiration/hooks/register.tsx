@@ -158,8 +158,6 @@ async function tick($: EngineInterface): Promise<void> {
 }
 
 export const register: Register = on => {
-  registerTheme(on)
-
   on('session.start', async ($, e, next) => {
     await $.command.register({
       name: 'hack',
@@ -168,12 +166,13 @@ export const register: Register = on => {
     })
     const saved = await $.store.get('isSpinnerOn')
     if (typeof saved === 'boolean') await update($, isSpinnerOn, () => saved)
-    await applyThemeAtStart($)
     const isUp = (await $.ui.panes()).some(pane => pane.id === PANE)
     await update($, isPaneOpen, () => isUp)
     $.clock.every(FRAME_MS, () => void tick($))
     $.clock.every(POLL_MS, () => void poll($))
     $.clock.every(RABBIT_FRAME_MS, () => void hopTick($))
+    // The look comes last and on its own: nothing it does may hold up or break the animations above.
+    void applyThemeAtStart($)
     return next(e)
   })
 
@@ -539,4 +538,7 @@ export const register: Register = on => {
       </Box>
     )
   })
+
+  // Last, so the look's backdrop hook can never get in the way of the hooks above.
+  registerTheme(on)
 }

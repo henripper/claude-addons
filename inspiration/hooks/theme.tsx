@@ -88,7 +88,11 @@ export async function setThemeOn($: EngineInterface, isOn: boolean): Promise<str
 
 /** Called from the plugin's one `session.start` hook. Clearing is only ever on the person's ask, never here. */
 export async function applyThemeAtStart($: EngineInterface): Promise<void> {
-  if ((await $.store.get('isThemeOn')) !== false) await paint($)
+  try {
+    if ((await $.store.get('isThemeOn')) !== false) await paint($)
+  } catch {
+    // Never let the look break a session: it is decoration.
+  }
 }
 
 export function registerTheme(on: Parameters<Register>[0]): void {
