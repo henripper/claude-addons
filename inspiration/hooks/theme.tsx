@@ -48,22 +48,41 @@ const LOOK: ThemeSetArgs = {
   backdrop: { scene: SCENE_ID, glass: { blur: 3, tint: '#030705', opacity: 0.62 } },
 }
 
-async function paint($: EngineInterface): Promise<void> {
-  // While you build: the line that would stop Desktop painting this look.
-  const unpainted = problems.find(line => line.startsWith("Desktop won't paint"))
-  if (unpainted !== undefined) $.ui.toast(unpainted)
-  const set = await $.theme.set(LOOK)
-  if (!set.isDrawn) $.ui.status(set.reason)
+/** Older builds have no `$.theme`: the call throws, and uncaught it would take the whole hook down. */
+function whyNot(error: unknown): string {
+  const detail = error instanceof Error ? error.message : String(error)
+  return `This version of Claude can’t draw the look (${detail}). Update the app, then try again. Everything else in this add-on works.`
+}
+
+/** Paints the look. Returns why nothing was drawn, or undefined when it was. */
+async function paint($: EngineInterface): Promise<string | undefined> {
+  try {
+    // While you build: the line that would stop Desktop painting this look.
+    const unpainted = problems.find(line => line.startsWith("Desktop won't paint"))
+    if (unpainted !== undefined) $.ui.toast(unpainted)
+    const set = await $.theme.set(LOOK)
+    if (!set.isDrawn) {
+      $.ui.status(set.reason)
+      return set.reason
+    }
+    return undefined
+  } catch (error) {
+    return whyNot(error)
+  }
 }
 
 /** `/hack theme on` or `/hack theme off`: remembered, and applied now. Returns the reply. */
 export async function setThemeOn($: EngineInterface, isOn: boolean): Promise<string> {
   await $.store.set('isThemeOn', isOn)
   if (isOn) {
-    await paint($)
-    return 'Phosphor Rain look is on.'
+    const why = await paint($)
+    return why === undefined ? 'Phosphor Rain look is on.' : `Phosphor Rain look is on, but nothing is drawn: ${why}`
   }
-  await $.theme.clear()
+  try {
+    await $.theme.clear()
+  } catch (error) {
+    return whyNot(error)
+  }
   return 'Phosphor Rain look is off: back to the app’s own look.'
 }
 
