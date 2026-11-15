@@ -9,11 +9,11 @@ export const RED = '#ff4d5e'
 const GLYPHS = 'ｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉ0123456789ABCDEF<>{}#$%&*+=/|'
 
 const WORDS: Record<string, string[]> = {
-  thinking: ['DECRYPTING', 'CRACKING CIPHERS', 'THERE IS NO SPOON', 'BRUTE-FORCING', 'BENDING THE SPOON'],
+  thinking: ['DECRYPTING', 'CRACKING CIPHERS', 'READING THE STATIC', 'BRUTE-FORCING', 'BENDING THE RULES'],
   requesting: ['DIALING IN', 'CALLING THE OPERATOR', 'REROUTING VIA {COUNTRY}', 'JACKING IN'],
   responding: ['UPLOADING PAYLOAD', 'TRANSMITTING', 'WRITING TO THE MAINFRAME'],
   'tool-input': ['INJECTING CODE', 'ARMING EXPLOIT'],
-  'tool-use': ['INFILTRATING', 'BYPASSING ICE', 'FOLLOWING THE WHITE RABBIT', 'HACKING THE GIBSON', 'DODGING BULLETS'],
+  'tool-use': ['INFILTRATING', 'BYPASSING ICE', 'CHASING THE RABBIT', 'HACKING THE MAINFRAME', 'DODGING ICE'],
 }
 
 /** A small deterministic hash, so a frame always draws the same cells. */

@@ -17,7 +17,7 @@ export type Turn = { startedAt: number; promptChars: number; toolCalls: number }
 
 declare module 'claude-code' {
   interface PluginState {
-    'hack-the-planet': {
+    'inspiration': {
       daemons: Daemon[]
       feed: string[]
       frame: number

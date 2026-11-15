@@ -1,7 +1,7 @@
-// The one-line ticker under the chat box: mini versions of The Gibson's animations,
+// The one-line ticker under the chat box: mini versions of The Mainframe's animations,
 // so they play even while the side panel is closed. Pure: the caller draws the segments.
 
-import { AMBER, DIM, GREEN, HOT } from './gibson'
+import { AMBER, DIM, GREEN, HOT } from './mainframe'
 
 export type Segment = { text: string; color: string }
 

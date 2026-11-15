@@ -1,4 +1,4 @@
-// The white rabbit, in ASCII: when a daemon finishes it gallops across The Gibson on
+// The rabbit, in ASCII: when a daemon finishes it gallops across The Mainframe on
 // all fours, side-on, and is gone. Drawn from its own fast frame counter.
 
 // Two poses facing right: gathered on the ground, then stretched out mid-leap.

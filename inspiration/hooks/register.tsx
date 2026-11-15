@@ -16,15 +16,16 @@ import {
   shortTool,
   sweep,
   cellLines,
-} from './gibson'
+} from './mainframe'
 import { EYE_MS, eyeLines, eyeTarget, isBrowserTool, lookedAt } from './eye'
-import { RABBIT_FRAME_MS, rabbitFrame } from './matrix'
+import { RABBIT_FRAME_MS, rabbitFrame } from './rabbit'
 import { blank, globeCells, loadLevel, paintShip, shipLane } from './scenes'
 import { tickerSegments } from './ticker'
+import { applyThemeAtStart, registerTheme, setThemeOn } from './theme'
 import type { Load } from './scenes'
 
-const PANE = 'gibson'
-const TITLE = 'The Gibson'
+const PANE = 'mainframe'
+const TITLE = 'The Mainframe'
 const FRAME_MS = 200
 const POLL_MS = 1000
 const LINGER_MS = 8000
@@ -32,20 +33,20 @@ const GLITCH_MS = 1600
 const RABBIT_MS = 3500
 const FEED_MAX = 40
 
-const daemons = atom({ plugin: 'hack-the-planet', key: 'daemons' } as const, [] as Daemon[])
-const feed = atom({ plugin: 'hack-the-planet', key: 'feed' } as const, [] as string[])
-const frame = atom({ plugin: 'hack-the-planet', key: 'frame' } as const, 0)
+const daemons = atom({ plugin: 'inspiration', key: 'daemons' } as const, [] as Daemon[])
+const feed = atom({ plugin: 'inspiration', key: 'feed' } as const, [] as string[])
+const frame = atom({ plugin: 'inspiration', key: 'frame' } as const, 0)
 // The desktop pane redraws once a second, not every frame: its SVGs animate themselves.
 // The rabbit's own frame counter: it runs on a faster clock than everything else.
-const hop = atom({ plugin: 'hack-the-planet', key: 'hop' } as const, 0)
-const second = atom({ plugin: 'hack-the-planet', key: 'second' } as const, 0)
-const browsing = atom({ plugin: 'hack-the-planet', key: 'browsing' } as const, null as Browsing)
+const hop = atom({ plugin: 'inspiration', key: 'hop' } as const, 0)
+const second = atom({ plugin: 'inspiration', key: 'second' } as const, 0)
+const browsing = atom({ plugin: 'inspiration', key: 'browsing' } as const, null as Browsing)
 
 const isEyeOpen = (eye: Browsing) => !!eye && Date.now() - eye.at < EYE_MS
-const EYE_WORDS = ['THE EYE IS WATCHING', 'ONE TAB TO RULE THEM ALL', 'SCRYING THE WEB', 'THE EYE SEES ALL']
-const turn = atom({ plugin: 'hack-the-planet', key: 'turn' } as const, null as Turn)
-const isPaneOpen = atom({ plugin: 'hack-the-planet', key: 'isPaneOpen' } as const, false)
-const isSpinnerOn = atom({ plugin: 'hack-the-planet', key: 'isSpinnerOn' } as const, true)
+const EYE_WORDS = ['THE EYE IS WATCHING', 'EVERY TAB, ALL AT ONCE', 'SCRYING THE WEB', 'THE EYE SEES ALL']
+const turn = atom({ plugin: 'inspiration', key: 'turn' } as const, null as Turn)
+const isPaneOpen = atom({ plugin: 'inspiration', key: 'isPaneOpen' } as const, false)
+const isSpinnerOn = atom({ plugin: 'inspiration', key: 'isSpinnerOn' } as const, true)
 
 const LIVE = new Set(['pending', 'running', 'waiting', 'idle'])
 const FAILED = new Set(['failed', 'killed'])
@@ -122,12 +123,12 @@ async function poll($: EngineInterface): Promise<void> {
       const took = elapsed(one.endedAt - one.startedAt)
       $.ui.toast(
         one.status === 'granted'
-          ? `◉ ${one.type.toUpperCase()} daemon followed the white rabbit: ACCESS GRANTED (${took})`
-          : `◉ ${one.type.toUpperCase()} daemon: ACCESS DENIED (${took}). Agent Smith got it.`,
+          ? `◉ ${one.type.toUpperCase()} daemon returned: ACCESS GRANTED (${took})`
+          : `◉ ${one.type.toUpperCase()} daemon: ACCESS DENIED (${took}). ICE got it.`,
       )
     }
   } catch (error) {
-    $.ui.log(`hack-the-planet: poll failed: ${String(error)}`, { to: 'debug' })
+    $.ui.log(`inspiration: poll failed: ${String(error)}`, { to: 'debug' })
   } finally {
     isPolling = false
   }
@@ -157,14 +158,17 @@ async function tick($: EngineInterface): Promise<void> {
 }
 
 export const register: Register = on => {
+  registerTheme(on)
+
   on('session.start', async ($, e, next) => {
     await $.command.register({
       name: 'hack',
-      description: 'Jack into The Gibson: a pane of your running agents, Hackers and Matrix style',
-      argumentHint: '[close | spinner on | spinner off]',
+      description: 'Open The Mainframe: a pane of your running agents, retro hacker style',
+      argumentHint: '[close | spinner on | spinner off | theme on | theme off]',
     })
     const saved = await $.store.get('isSpinnerOn')
     if (typeof saved === 'boolean') await update($, isSpinnerOn, () => saved)
+    await applyThemeAtStart($)
     const isUp = (await $.ui.panes()).some(pane => pane.id === PANE)
     await update($, isPaneOpen, () => isUp)
     $.clock.every(FRAME_MS, () => void tick($))
@@ -178,7 +182,7 @@ export const register: Register = on => {
     if (args === 'close') {
       await $.ui.close({ id: PANE })
       await update($, isPaneOpen, () => false)
-      return { text: 'Connection terminated. The Gibson is closed.' }
+      return { text: 'Connection terminated. The Mainframe is closed.' }
     }
     if (args === 'spinner on' || args === 'spinner off') {
       const isOn = args === 'spinner on'
@@ -186,9 +190,12 @@ export const register: Register = on => {
       await $.store.set('isSpinnerOn', isOn)
       return { text: isOn ? 'Hacker spinner on.' : 'Hacker spinner off: back to the stock spinner.' }
     }
+    if (args === 'theme on' || args === 'theme off') {
+      return { text: await setThemeOn($, args === 'theme on') }
+    }
     await openPane($)
     void poll($)
-    return { text: 'Jacked in. The Gibson is open beside the chat. Hack the planet.' }
+    return { text: 'Jacked in. The Mainframe is open beside the chat.' }
   })
 
   on('ui.close', async ($, e, next) => {
@@ -269,7 +276,7 @@ export const register: Register = on => {
     const load = levelOf(list, current)
     const isEye = isEyeOpen(eye)
     const now = Date.now()
-    // With The Gibson closed, the band also plays the rabbit's run.
+    // With The Mainframe closed, the band also plays the rabbit's run.
     const rabbit = !open ? [...list].reverse().find(one => one.status === 'granted' && now - one.endedAt < RABBIT_MS) : undefined
     if (live === 0 && load === 0 && !isEye && !rabbit) return next(e)
 
@@ -278,7 +285,7 @@ export const register: Register = on => {
     const ui = $.ui.resolve(e)
     const { Box, Text, Button } = ui
     const columns = Math.max(20, e.props.bodyColumns)
-    // The full-size art, when The Gibson is closed: the most striking one, at most 8 rows.
+    // The full-size art, when The Mainframe is closed: the most striking one, at most 8 rows.
     let big = null
     if (!open) {
       const art = (key: string, lines: string[], color: (y: number) => string) => (
@@ -449,7 +456,7 @@ export const register: Register = on => {
           {rabbit && (
             <Box flexDirection="column">
               <Text color={GREEN} bold>
-                Follow the white rabbit.
+                Quick as a rabbit.
               </Text>
               {rabbitFrame(rabbitAt, columns).map((line, k) => (
                 <Text key={`r-${k}`} color="#f4f8f6">
@@ -466,8 +473,8 @@ export const register: Register = on => {
     const header = (
       <Box flexDirection="column" gap={1}>
         <Text color={GREEN} bold>
-          {'░▒▓ THE GIBSON ▓▒░'}
-          <Text color={DIM}> hack the planet</Text>
+          {'░▒▓ THE MAINFRAME ▓▒░'}
+          <Text color={DIM}> full access</Text>
         </Text>
         {scenes}
       </Box>

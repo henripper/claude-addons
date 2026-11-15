@@ -1,8 +1,8 @@
-// The Eye of Sauron, in pixels, for while Claude browses the web: a fiery almond eye
+// The Eye, in pixels, for while Claude browses the web: a fiery almond eye
 // with a slit pupil that looks around, flames flickering in four frames, and the horns
-// of Barad-dûr, drawn as plain text lines.
+// of a dark tower, drawn as plain text lines.
 
-import { hash } from './gibson'
+import { hash } from './mainframe'
 
 export const EYE_MS = 12000
 
@@ -68,7 +68,7 @@ const HORNS: Map<string, string> = (() => {
   return out
 })()
 
-/** Barad-dûr: the horns cradling the eye and the tower's crown beneath it. */
+/** a dark tower: the horns cradling the eye and the tower's crown beneath it. */
 function tower(x: number, y: number): string | null {
   const horn = HORNS.get(`${x},${y}`)
   if (horn) return horn

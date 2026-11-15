@@ -10,9 +10,9 @@
       "description": "Shows plan usage (session and weekly limits) and when each resets, above the prompt"
     },
     {
-      "name": "hack-the-planet",
-      "source": "./hack-the-planet",
-      "description": "Hackers + Matrix + Tolkien in colored text: a hacker spinner, /hack opens The Gibson (agent cards, a galloping white rabbit, a globe and freighter under load, the Eye of Sauron while browsing or looking at images), and a band chip while agents run"
+      "name": "inspiration",
+      "source": "./inspiration",
+      "description": "Retro hacker-movie mode in colored text: a hacker spinner, /hack opens The Mainframe (agent cards, a galloping rabbit, a globe and freighter under load, the Eye while browsing or looking at images), a band chip while agents run, and a phosphor-green dark theme with digital rain behind the chat"
     }
   ]
 }

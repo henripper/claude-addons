@@ -1,15 +1,15 @@
 import { expect, mock, test } from 'claude-code/testing'
 
-import { cellLines, hackerWord, shortTool, sweep } from '../hooks/gibson'
+import { cellLines, hackerWord, shortTool, sweep } from '../hooks/mainframe'
 import { eyeLines, eyeTarget, lookedAt } from '../hooks/eye'
-import { rabbitFrame } from '../hooks/matrix'
+import { rabbitFrame } from '../hooks/rabbit'
 import { globeCells, loadLevel, shipLane } from '../hooks/scenes'
 
 const AGENT = { id: 'a1', description: 'Find auth code', type: 'Explore', status: 'running' as const }
 const SITE = { bodyColumns: 80, scroll: { offset: 0, bodyRows: 30 }, view: {} }
 const BAND = { ...SITE, hasSurvey: false, isWorking: false, maxRows: 10 }
 const HACK = { command: 'hack', args: '', origin: { kind: 'composer' as const }, presentation: { isFullscreen: true, columns: 160 } }
-const PANE = { ...SITE, title: 'The Gibson', isFocused: false, placement: 'dock' as const }
+const PANE = { ...SITE, title: 'The Mainframe', isFocused: false, placement: 'dock' as const }
 
 test('drawing helpers stay in bounds', async () => {
   expect(sweep(5, 14).length).toBe(14)
@@ -36,7 +36,7 @@ test('band chip shows running daemons and keeps the other bands', async ($, on) 
 
   for (const surface of ['terminal', 'desktop'] as const) {
     const ui = await $.ui.mount({
-      plugin: 'hack-the-planet',
+      plugin: 'inspiration',
       surface,
       component: 'AbovePrompt',
       props: BAND,
@@ -55,13 +55,13 @@ test('the pane draws a card per daemon on both surfaces', async ($, on) => {
   await clock.advance(1100)
 
   for (const surface of ['terminal', 'desktop'] as const) {
-    const ui = await $.ui.mount({ plugin: 'hack-the-planet', surface, component: 'Pane', requestId: 'gibson', props: PANE })
+    const ui = await $.ui.mount({ plugin: 'inspiration', surface, component: 'Pane', requestId: 'mainframe', props: PANE })
     expect(await ui.find({ type: 'Text', text: /EXPLORE/ })).toBeDefined()
     await ui.unmount()
   }
 })
 
-test('browsing summons the Eye of Sauron on both surfaces', async ($, on) => {
+test('browsing summons the Eye on both surfaces', async ($, on) => {
   const clock = mock.clock(on)
   on('ui.open', () => ({ value: { isPlaced: true } }))
   on('tool.call', () => ({ result: 'ok' }) as never)
@@ -75,10 +75,10 @@ test('browsing summons the Eye of Sauron on both surfaces', async ($, on) => {
   await clock.advance(300)
 
   for (const surface of ['terminal', 'desktop'] as const) {
-    const pane = await $.ui.mount({ plugin: 'hack-the-planet', surface, component: 'Pane', requestId: 'gibson', props: PANE })
+    const pane = await $.ui.mount({ plugin: 'inspiration', surface, component: 'Pane', requestId: 'mainframe', props: PANE })
     expect(await pane.find({ type: 'Text', text: /example\.com/ })).toBeDefined()
     await pane.unmount()
-    const band = await $.ui.mount({ plugin: 'hack-the-planet', surface, component: 'AbovePrompt', props: BAND })
+    const band = await $.ui.mount({ plugin: 'inspiration', surface, component: 'AbovePrompt', props: BAND })
     expect(await band.find({ type: 'Text', text: /example\.com/ })).toBeDefined()
     expect(await band.find({ type: 'Text', text: /Session 42%/ })).toBeDefined()
     await band.unmount()
@@ -87,7 +87,7 @@ test('browsing summons the Eye of Sauron on both surfaces', async ($, on) => {
 
 test('the spinner speaks hacker', async $ => {
   const ui = await $.ui.mount({
-    plugin: 'hack-the-planet',
+    plugin: 'inspiration',
     surface: 'terminal',
     component: 'Spinner',
     props: { word: 'Working', message: null, suffix: '…', mode: 'thinking' as const },
@@ -127,10 +127,10 @@ test('three daemons bring the globe and the cargo ship on both surfaces', async 
   await clock.advance(1100)
 
   for (const surface of ['terminal', 'desktop'] as const) {
-    const ui = await $.ui.mount({ plugin: 'hack-the-planet', surface, component: 'Pane', requestId: 'gibson', props: PANE })
+    const ui = await $.ui.mount({ plugin: 'inspiration', surface, component: 'Pane', requestId: 'mainframe', props: PANE })
     expect(await ui.find({ type: 'Text', text: /HEAVY TRAFFIC/ })).toBeDefined()
     await ui.unmount()
-    const band = await $.ui.mount({ plugin: 'hack-the-planet', surface, component: 'AbovePrompt', props: BAND })
+    const band = await $.ui.mount({ plugin: 'inspiration', surface, component: 'AbovePrompt', props: BAND })
     expect(await band.find({ type: 'Text', text: /HEAVY TRAFFIC/ })).toBeDefined()
     await band.unmount()
   }
@@ -144,7 +144,7 @@ test('two daemons draw the globe in text on the desktop', async ($, on) => {
   await $.command.run(HACK)
   await clock.advance(1100)
 
-  const ui = await $.ui.mount({ plugin: 'hack-the-planet', surface: 'desktop', component: 'Pane', requestId: 'gibson', props: PANE })
+  const ui = await $.ui.mount({ plugin: 'inspiration', surface: 'desktop', component: 'Pane', requestId: 'mainframe', props: PANE })
   expect(await ui.find({ type: 'Text', text: /GLOBAL UPLINK/ })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: /[█▓]/ })).toBeDefined()
   await ui.unmount()
@@ -159,7 +159,7 @@ test('the ticker under the chat box plays the minis and keeps the hint', async (
   await clock.advance(1100)
 
   for (const surface of ['terminal', 'desktop'] as const) {
-    const ui = await $.ui.mount({ plugin: 'hack-the-planet', surface, component: 'PromptHint', props: { isDraft: false, isWorking: true, hint: 'esc to interrupt' } })
+    const ui = await $.ui.mount({ plugin: 'inspiration', surface, component: 'PromptHint', props: { isDraft: false, isWorking: true, hint: 'esc to interrupt' } })
     expect(await ui.find({ type: 'Text', text: /esc to interrupt/ })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: /UPLINK/ })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: /ICE 3/ })).toBeDefined()
@@ -167,7 +167,7 @@ test('the ticker under the chat box plays the minis and keeps the hint', async (
   }
 })
 
-test('with The Gibson closed the band draws the full-size art', async ($, on) => {
+test('with The Mainframe closed the band draws the full-size art', async ($, on) => {
   const clock = mock.clock(on)
   on('agent.list', () => ({ value: ['a1', 'a2'].map(id => ({ ...AGENT, id })) }))
   on('ui.toast', () => ({ value: undefined }))
@@ -181,7 +181,7 @@ test('with The Gibson closed the band draws the full-size art', async ($, on) =>
   await clock.advance(1100)
   await $.command.run({ ...HACK, args: 'close' })
 
-  const ui = await $.ui.mount({ plugin: 'hack-the-planet', surface: 'desktop', component: 'AbovePrompt', props: BAND })
+  const ui = await $.ui.mount({ plugin: 'inspiration', surface: 'desktop', component: 'AbovePrompt', props: BAND })
   expect(await ui.find({ type: 'Text', text: /Session 42%/ })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: /[█▓]/ })).toBeDefined()
   await ui.unmount()
@@ -198,7 +198,7 @@ test('looking at an image or upload summons the Eye too', async ($, on) => {
   await $.command.run(HACK)
   await $.tool.call({ tool: 'Read', file_path: '/Users/me/Desktop/plot.png' } as never)
   await clock.advance(300)
-  const pane = await $.ui.mount({ plugin: 'hack-the-planet', surface: 'desktop', component: 'Pane', requestId: 'gibson', props: PANE })
+  const pane = await $.ui.mount({ plugin: 'inspiration', surface: 'desktop', component: 'Pane', requestId: 'mainframe', props: PANE })
   expect(await pane.find({ type: 'Text', text: /plot\.png/ })).toBeDefined()
   await pane.unmount()
 })

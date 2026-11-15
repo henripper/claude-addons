@@ -1,5 +1,5 @@
 // Heavy-traffic scenes: a spinning pixel globe and a cargo freighter flyby.
-// Pure like gibson.ts: cell grids, drawn as a Raster or as colored text.
+// Pure like mainframe.ts: cell grids, drawn as a Raster or as colored text.
 
 
 export type Load = 0 | 1 | 2
