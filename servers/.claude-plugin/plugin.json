@@ -1,0 +1,1 @@
+{ "name": "servers", "version": "0.1.1", "author": { "name": "henrip" }, "description": "Shows listening dev servers above the prompt, with a Kill button for each", "types": "./types/index.d.ts" }
