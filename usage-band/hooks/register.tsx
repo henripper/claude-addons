@@ -85,16 +85,20 @@ export const register: Register = on => {
     const list = await read($, limits)
     const nowMs = (await read($, now)) || Date.now()
     const { Box, Text } = $.ui.resolve(e)
+    // The band has one slot: keep whatever another plugin (e.g. servers) draws beneath us.
+    const beneath = await next(e)
 
     if (list.length === 0) {
       return (
-        <Box>
+        <Box flexDirection="column">
           <Text dimColor>Usage: waiting for the first response…</Text>
+          {beneath}
         </Box>
       )
     }
 
     return (
+      <Box flexDirection="column">
       <Box flexDirection="row" flexWrap="wrap">
         {list.map(l => {
           const pct = Math.round(l.percentUsed)
@@ -111,6 +115,8 @@ export const register: Register = on => {
             </Box>
           )
         })}
+      </Box>
+      {beneath}
       </Box>
     )
   })

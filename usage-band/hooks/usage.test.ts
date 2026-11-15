@@ -31,6 +31,8 @@ for (const surface of ['terminal', 'desktop'] as const) {
       ],
     } }) as never)
     on('session.start', () => ({ cwd: '/tmp' }) as never)
+    // Another plugin's band beneath, as servers draws: it must still show.
+    on('ui.render', { component: 'AbovePrompt' }, ($, e) => $.ui.resolve(e).Text({ children: '1 server running' } as never) as never)
     await $.session.start({ cwd: '/tmp', surface, isInteractive: true } as never)
     const band = await $.ui.mount({
       plugin: 'usage-band',
@@ -43,5 +45,6 @@ for (const surface of ['terminal', 'desktop'] as const) {
     expect(tree).toContain('89%')
     expect(tree).toContain('Week')
     expect(tree.indexOf('Session')).toBeLessThan(tree.indexOf('Week'))
+    expect(tree).toContain('1 server running')
   })
 }
